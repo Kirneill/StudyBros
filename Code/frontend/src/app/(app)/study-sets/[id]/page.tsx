@@ -10,6 +10,25 @@ import { ApiError } from "@/lib/api";
 import { STUDY_SET_TYPES } from "@/lib/constants";
 import Link from "next/link";
 
+function getStudySetItems(content: Record<string, unknown> | unknown[]): unknown[] {
+  if (Array.isArray(content)) {
+    return content;
+  }
+  if (Array.isArray(content.cards)) {
+    return content.cards;
+  }
+  if (Array.isArray(content.questions)) {
+    return content.questions;
+  }
+  if (Array.isArray(content.key_concepts)) {
+    return content.key_concepts;
+  }
+  if (Array.isArray(content.main_points)) {
+    return content.main_points;
+  }
+  return [];
+}
+
 export default function StudySetDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -45,7 +64,7 @@ export default function StudySetDetailPage() {
   }
 
   const typeInfo = STUDY_SET_TYPES[studySet.set_type as keyof typeof STUDY_SET_TYPES];
-  const items = Array.isArray(studySet.content) ? studySet.content : [];
+  const items = getStudySetItems(studySet.content);
 
   return (
     <div>
@@ -118,6 +137,17 @@ export default function StudySetDetailPage() {
         </CardHeader>
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
           {items.map((item, i) => {
+            if (typeof item === "string") {
+              return (
+                <div key={i} className="p-4 rounded-lg bg-bg-input border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge>#{i + 1}</Badge>
+                  </div>
+                  <p className="text-sm text-text-secondary">{item}</p>
+                </div>
+              );
+            }
+
             const obj = item as Record<string, unknown>;
             return (
               <div key={i} className="p-4 rounded-lg bg-bg-input border border-border">
@@ -128,17 +158,28 @@ export default function StudySetDetailPage() {
                   )}
                 </div>
                 {/* Flashcard */}
-                {obj.front !== undefined && (
+                {(obj.front !== undefined || obj.question !== undefined) && (
                   <div>
-                    <p className="text-sm font-medium">{String(obj.front)}</p>
-                    <p className="text-sm text-text-secondary mt-2">{String(obj.back)}</p>
+                    <p className="text-sm font-medium">{String(obj.front ?? obj.question)}</p>
+                    <p className="text-sm text-text-secondary mt-2">{String(obj.back ?? obj.answer ?? "")}</p>
                   </div>
                 )}
                 {/* Quiz question */}
-                {obj.question !== undefined && (
+                {obj.prompt !== undefined && (
                   <div>
-                    <p className="text-sm font-medium">{String(obj.question)}</p>
-                    {Array.isArray(obj.options) && (
+                    <p className="text-sm font-medium">{String(obj.prompt)}</p>
+                    {Array.isArray(obj.options) && obj.options.every((opt) => typeof opt === "object") && (
+                      <ul className="mt-2 space-y-1">
+                        {(obj.options as Record<string, unknown>[]).map((opt, j) => (
+                          <li key={j} className={`text-sm px-2 py-1 rounded ${
+                            j === Number(obj.correct_index) ? "text-success bg-success/5" : "text-text-secondary"
+                          }`}>
+                            {String.fromCharCode(65 + j)}. {String(opt.text ?? "")}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {Array.isArray(obj.options) && obj.options.every((opt) => typeof opt === "string") && (
                       <ul className="mt-2 space-y-1">
                         {(obj.options as string[]).map((opt, j) => (
                           <li key={j} className={`text-sm px-2 py-1 rounded ${

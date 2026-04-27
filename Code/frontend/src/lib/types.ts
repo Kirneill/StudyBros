@@ -13,6 +13,14 @@ export interface Chunk {
   char_count: number;
 }
 
+export interface UpdateDocumentRequest {
+  title: string;
+}
+
+export interface BulkDeleteDocumentsRequest {
+  document_ids: number[];
+}
+
 // Study Sets
 export interface StudySet {
   id: number;
@@ -60,6 +68,20 @@ export interface Progress {
   mastery_level: number;
   bloom_highest_level: number;
   total_reviews: number;
+}
+
+export interface StudySessionCompleteRequest {
+  total_items: number;
+  correct_count: number;
+  confidence_sum: number;
+  bloom_level_distribution: Record<string, number>;
+}
+
+export interface StudySessionCompleteResponse {
+  session_id: number;
+  total_items: number;
+  correct_count: number;
+  accuracy: number;
 }
 
 // Generation

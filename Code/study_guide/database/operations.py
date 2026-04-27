@@ -107,6 +107,15 @@ class DatabaseOperations:
         """Get all documents for a source."""
         return self.session.query(Document).filter(Document.source_id == source_id).all()
 
+    def update_document_title(self, document_id: int, title: str) -> Optional[Document]:
+        """Update a document title."""
+        document = self.get_document(document_id)
+        if document is None:
+            return None
+        document.title = title
+        self.session.commit()
+        return document
+
     # --- Chunk operations ---
 
     def create_chunk(

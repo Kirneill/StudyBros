@@ -18,17 +18,26 @@ interface TestQuestion {
 
 function isQuestionRecord(
   item: unknown,
-): item is Record<string, unknown> & { question: string; options: unknown[] } {
+): item is Record<string, unknown> & { prompt: string; options?: unknown[] } {
   if (typeof item !== "object" || item === null) return false;
   const obj = item as Record<string, unknown>;
-  return typeof obj.question === "string" && Array.isArray(obj.options);
+  return typeof obj.prompt === "string";
 }
 
 function parseQuestion(item: Record<string, unknown>): TestQuestion {
+  const options = Array.isArray(item.options)
+    ? item.options.map((opt) =>
+        typeof opt === "object" && opt !== null
+          ? String((opt as Record<string, unknown>).text ?? "")
+          : String(opt),
+      )
+    : [];
+  const correctAnswer = Number(item.correct_index ?? item.correct_answer ?? 0);
+
   return {
-    question: String(item.question),
-    options: (item.options as string[]).map(String),
-    correctAnswer: Number(item.correct_answer ?? 0),
+    question: String(item.prompt),
+    options,
+    correctAnswer: Number.isFinite(correctAnswer) ? correctAnswer : 0,
     explanation: String(item.explanation ?? ""),
     bloomLevel:
       typeof item.bloom_level === "number" ? item.bloom_level : undefined,
@@ -57,7 +66,11 @@ export default function PracticeTestPage() {
 
   const questions: TestQuestion[] = (() => {
     if (!studySet) return [];
-    const content = Array.isArray(studySet.content) ? studySet.content : [];
+    const content = Array.isArray(studySet.content)
+      ? studySet.content
+      : Array.isArray(studySet.content.questions)
+        ? studySet.content.questions
+        : [];
     return content.filter(isQuestionRecord).map(parseQuestion);
   })();
 

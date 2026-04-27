@@ -26,22 +26,54 @@ class PDFExtractor(BaseExtractor):
             reader = PdfReader(str(filepath))
 
             all_text: list[str] = []
+            failed_pages: list[int] = []
             page_count = 0
             title = None
 
             # Try to get title from metadata
             if reader.metadata:
-                title = reader.metadata.get("/Title") or reader.metadata.get("title")
+                raw_title = reader.metadata.get("/Title") or reader.metadata.get("title")
+                if raw_title is not None:
+                    normalized_title = str(raw_title).strip()
+                    title = normalized_title or None
+
+            if reader.is_encrypted:
+                return ExtractionResult(
+                    text="",
+                    success=False,
+                    error="PDF is encrypted and cannot be processed without decryption support.",
+                )
 
             for page_num, page in enumerate(reader.pages, start=1):
                 page_count += 1
-                page_text = page.extract_text()
+                try:
+                    page_text = page.extract_text()
+                except Exception:
+                    failed_pages.append(page_num)
+                    continue
 
                 if page_text and page_text.strip():
                     all_text.append(f"\n--- Page {page_num} ---\n")
                     all_text.append(page_text.strip())
 
             combined_text = "\n".join(all_text)
+
+            if not combined_text.strip():
+                error = "No extractable text found in PDF."
+                if failed_pages:
+                    error += f" Failed pages: {failed_pages}."
+                error += " The file may be image-only, encrypted, or malformed."
+                return ExtractionResult(
+                    text="",
+                    title=title or filepath.stem,
+                    metadata={
+                        "page_count": page_count,
+                        "failed_pages": failed_pages,
+                        "file_type": "pdf",
+                    },
+                    success=False,
+                    error=error,
+                )
 
             # If no title from metadata, try first line
             if not title and combined_text:
@@ -54,6 +86,7 @@ class PDFExtractor(BaseExtractor):
                 title=title or filepath.stem,
                 metadata={
                     "page_count": page_count,
+                    "failed_pages": failed_pages,
                     "file_type": "pdf",
                 },
                 success=True,

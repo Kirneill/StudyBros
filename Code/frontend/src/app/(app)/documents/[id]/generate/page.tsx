@@ -30,6 +30,19 @@ const PROVIDER_LABELS: Record<GenerationProvider, string> = {
   openrouter: "OpenRouter",
 };
 
+function isProviderCredentialError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return [
+    "api key",
+    "invalid_api_key",
+    "incorrect api key",
+    "credit balance",
+    "billing",
+    "unauthorized",
+    "authentication",
+  ].some((fragment) => normalized.includes(fragment));
+}
+
 function getStoredProviderKeys(): ProviderKeyState {
   if (typeof window === "undefined") {
     return {};
@@ -64,6 +77,7 @@ export default function GeneratePage() {
   const [providerKeys, setProviderKeys] = useState<ProviderKeyState>(getStoredProviderKeys);
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [pendingKey, setPendingKey] = useState("");
+  const [keyModalMessage, setKeyModalMessage] = useState<string | null>(null);
 
   const availableProviders = useMemo(
     () => providerData?.providers ?? [],
@@ -99,6 +113,14 @@ export default function GeneratePage() {
     });
   }, []);
 
+  const openKeyModal = useCallback((message?: string) => {
+    setPendingKey(providerKeys[effectiveProvider] ?? "");
+    setKeyModalMessage(
+      message ?? `Enter a ${PROVIDER_LABELS[effectiveProvider]} API key. A saved browser key overrides the server key for this provider.`,
+    );
+    setKeyModalOpen(true);
+  }, [effectiveProvider, providerKeys]);
+
   const runGenerate = useCallback(async (apiKeyOverride?: string) => {
     setGenerating(true);
     setToast(null);
@@ -111,23 +133,32 @@ export default function GeneratePage() {
         api_key: apiKeyOverride ?? activeClientKey ?? undefined,
       });
       setToast({ message: `Generated ${result.item_count} items!`, type: "success" });
-      setTimeout(() => router.push(`/study-sets/${result.id}`), 1500);
+      setTimeout(() => {
+        router.push(`/study-sets/${result.id}`);
+        router.refresh();
+      }, 1500);
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : "Generation failed";
       setToast({ message, type: "error" });
+      if (isProviderCredentialError(message)) {
+        openKeyModal(
+          `The current ${PROVIDER_LABELS[effectiveProvider]} key failed. Enter your own key to override it for this browser and try again.`,
+        );
+      }
     } finally {
       setGenerating(false);
     }
-  }, [activeClientKey, count, difficulty, docId, effectiveProvider, genType, router]);
+  }, [activeClientKey, count, difficulty, docId, effectiveProvider, genType, openKeyModal, router]);
 
   const handleGenerate = useCallback(async () => {
     if (!selectedProvider?.has_server_key && !activeClientKey) {
-      setPendingKey("");
-      setKeyModalOpen(true);
+      openKeyModal(
+        `The server does not have a ${PROVIDER_LABELS[effectiveProvider]} key configured. Enter your key to continue.`,
+      );
       return;
     }
     await runGenerate();
-  }, [activeClientKey, runGenerate, selectedProvider]);
+  }, [activeClientKey, effectiveProvider, openKeyModal, runGenerate, selectedProvider]);
 
   const handleSaveKeyAndGenerate = useCallback(async () => {
     const normalized = pendingKey.trim();
@@ -172,20 +203,28 @@ export default function GeneratePage() {
           {selectedProvider && (
             <Card className="mt-3 p-4">
               <p className="text-sm text-text-secondary">
-                {selectedProvider.has_server_key
-                  ? `Using the server-configured ${selectedProvider.display_name} key.`
-                  : activeClientKey
-                    ? `Using a ${selectedProvider.display_name} key saved in this browser.`
+                {activeClientKey
+                  ? `Using a ${selectedProvider.display_name} key saved in this browser. This overrides the server key for generation.`
+                  : selectedProvider.has_server_key
+                    ? `Using the server-configured ${selectedProvider.display_name} key.`
                     : `No ${selectedProvider.display_name} key is configured on the server. You will be prompted to enter one.`}
               </p>
-              {!selectedProvider.has_server_key && activeClientKey && (
+              <div className="mt-3 flex flex-wrap gap-3 text-xs">
                 <button
-                  onClick={() => persistProviderKey(effectiveProvider, "")}
-                  className="mt-2 text-xs text-accent hover:text-accent-hover"
+                  onClick={() => openKeyModal()}
+                  className="text-accent hover:text-accent-hover"
                 >
-                  Clear saved key
+                  {activeClientKey ? "Edit personal key" : "Use your own key"}
                 </button>
-              )}
+                {activeClientKey && (
+                  <button
+                    onClick={() => persistProviderKey(effectiveProvider, "")}
+                    className="text-text-muted hover:text-text-primary"
+                  >
+                    {selectedProvider.has_server_key ? "Use server key instead" : "Clear saved key"}
+                  </button>
+                )}
+              </div>
             </Card>
           )}
         </div>
@@ -268,9 +307,10 @@ export default function GeneratePage() {
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            The server does not have a {PROVIDER_LABELS[effectiveProvider]} key configured. Enter
-            your key to continue generation. It will be stored only in this browser on this
-            device.
+            {keyModalMessage}
+          </p>
+          <p className="text-xs text-text-muted">
+            Your key is stored only in this browser on this device.
           </p>
           <div>
             <label htmlFor="provider-api-key" className="text-sm font-medium mb-2 block">

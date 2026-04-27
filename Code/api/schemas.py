@@ -25,6 +25,14 @@ class ChunkResponse(BaseModel):
     char_count: int
 
 
+class DocumentUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+
+
+class DocumentBulkDeleteRequest(BaseModel):
+    document_ids: list[int] = Field(min_length=1)
+
+
 # ---------------------------------------------------------------------------
 # Study Sets
 # ---------------------------------------------------------------------------
@@ -81,6 +89,20 @@ class ProgressResponse(BaseModel):
     mastery_level: float
     bloom_highest_level: int
     total_reviews: int
+
+
+class StudySessionCompleteRequest(BaseModel):
+    total_items: int = Field(ge=1)
+    correct_count: int = Field(ge=0)
+    confidence_sum: float = Field(default=0.0, ge=0.0)
+    bloom_level_distribution: dict[str, int] = Field(default_factory=dict)
+
+
+class StudySessionCompleteResponse(BaseModel):
+    session_id: int
+    total_items: int
+    correct_count: int
+    accuracy: float
 
 
 # ---------------------------------------------------------------------------

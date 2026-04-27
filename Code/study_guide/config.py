@@ -23,6 +23,7 @@ class Config:
 
     # Export directory
     EXPORT_DIR = Path(os.getenv("STUDY_GUIDE_EXPORT_DIR", str(DATA_DIR / "exports")))
+    LOG_DIR = Path(os.getenv("STUDY_GUIDE_LOG_DIR", str(BASE_DIR / "logs")))
 
     # Generation provider settings
     GENERATION_PROVIDER = os.getenv("STUDY_GUIDE_GENERATION_PROVIDER", "openai")
@@ -34,15 +35,15 @@ class Config:
 
     OPENAI_GENERATION_MODEL = os.getenv(
         "STUDY_GUIDE_OPENAI_MODEL",
-        os.getenv("STUDY_GUIDE_GENERATION_MODEL", "gpt-4o"),
+        os.getenv("STUDY_GUIDE_GENERATION_MODEL", "gpt-5.4"),
     )
     ANTHROPIC_GENERATION_MODEL = os.getenv(
         "STUDY_GUIDE_ANTHROPIC_MODEL",
-        "claude-3-5-sonnet-latest",
+        "claude-sonnet-4-6",
     )
     OPENROUTER_GENERATION_MODEL = os.getenv(
         "STUDY_GUIDE_OPENROUTER_MODEL",
-        "openai/gpt-4o-mini",
+        "anthropic/claude-sonnet-4.6",
     )
 
     # Backward-compatible alias for legacy call sites
@@ -72,6 +73,7 @@ class Config:
         """Create necessary directories if they don't exist."""
         cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
         cls.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        cls.LOG_DIR.mkdir(parents=True, exist_ok=True)
         cls.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     @classmethod

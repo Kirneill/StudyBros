@@ -19,6 +19,25 @@ interface CardData {
   bloomLevel?: number;
 }
 
+function getFlashcardItems(content: Record<string, unknown> | unknown[]): unknown[] {
+  if (Array.isArray(content)) {
+    return content;
+  }
+  if (Array.isArray(content.cards)) {
+    return content.cards;
+  }
+  return [];
+}
+
+function getBloomLevelDistribution(cards: CardData[]): Record<string, number> {
+  return cards.reduce<Record<string, number>>((distribution, card) => {
+    const level = card.bloomLevel ?? 1;
+    const key = String(level);
+    distribution[key] = (distribution[key] ?? 0) + 1;
+    return distribution;
+  }, {});
+}
+
 export default function StudyPage() {
   const params = useParams<{ id: string }>();
   const studySetId = Number(params.id);
@@ -30,6 +49,7 @@ export default function StudyPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [ratings, setRatings] = useState<number[]>([]);
+  const [confidenceRatings, setConfidenceRatings] = useState<number[]>([]);
   const [sessionDone, setSessionDone] = useState(false);
   const [lastReview, setLastReview] = useState<ReviewResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +57,7 @@ export default function StudyPage() {
 
   const cards: CardData[] = (() => {
     if (!studySet) return [];
-    const content = Array.isArray(studySet.content) ? studySet.content : [];
+    const content = getFlashcardItems(studySet.content);
     return content.map((item, i) => {
       const obj = item as Record<string, unknown>;
       return {
@@ -66,23 +86,46 @@ export default function StudyPage() {
           confidence,
         });
         setLastReview(response);
-        setRatings((prev) => [...prev, rating]);
+        const nextRatings = [...ratings, rating];
+        const nextConfidenceRatings = [...confidenceRatings, confidence];
+        setRatings(nextRatings);
+        setConfidenceRatings(nextConfidenceRatings);
 
         setTimeout(() => {
-          setLastReview(null);
-          setRevealed(false);
-          if (currentIndex + 1 >= totalCards) {
-            api
-              .getStrengthsWeaknesses()
-              .then(setSwData)
-              .catch(() => {
+          const finalizeReview = async () => {
+            setLastReview(null);
+            setRevealed(false);
+
+            if (currentIndex + 1 >= totalCards) {
+              try {
+                await api.completeStudySession(studySetId, {
+                  total_items: totalCards,
+                  correct_count: nextRatings.filter((value) => value >= 3).length,
+                  confidence_sum: nextConfidenceRatings.reduce((sum, value) => sum + value, 0),
+                  bloom_level_distribution: getBloomLevelDistribution(cards),
+                });
+              } catch (sessionError) {
+                console.error(
+                  "Study session save failed:",
+                  sessionError instanceof ApiError ? sessionError.detail : sessionError,
+                );
+              }
+
+              try {
+                const strengths = await api.getStrengthsWeaknesses();
+                setSwData(strengths);
+              } catch {
                 /* non-critical */
-              });
-            setSessionDone(true);
-          } else {
-            setCurrentIndex((prev) => prev + 1);
-          }
-          setSubmitting(false);
+              }
+              setSessionDone(true);
+            } else {
+              setCurrentIndex((prev) => prev + 1);
+            }
+
+            setSubmitting(false);
+          };
+
+          void finalizeReview();
         }, 1200);
       } catch (err) {
         setSubmitting(false);
@@ -92,7 +135,7 @@ export default function StudyPage() {
         );
       }
     },
-    [currentCard, currentIndex, totalCards, studySetId, submitting]
+    [cards, confidenceRatings, currentCard, currentIndex, ratings, studySetId, submitting, totalCards]
   );
 
   if (loadingSet) {

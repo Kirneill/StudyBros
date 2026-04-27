@@ -10,18 +10,22 @@ import * as api from "@/lib/api";
 import type { QuizQuestion } from "@/lib/types";
 
 function parseQuizQuestions(content: Record<string, unknown> | unknown[]): QuizQuestion[] {
-  const items = Array.isArray(content) ? content : [];
+  const items = Array.isArray(content)
+    ? content
+    : Array.isArray(content.questions)
+      ? content.questions
+      : [];
   return items
     .filter((item) => {
       const obj = item as Record<string, unknown>;
-      return obj.question !== undefined && Array.isArray(obj.options);
+      return obj.prompt !== undefined && Array.isArray(obj.options);
     })
     .map((item) => {
       const obj = item as Record<string, unknown>;
       return {
-        question: String(obj.question),
-        options: (obj.options as string[]).map(String),
-        correct_answer: Number(obj.correct_answer ?? 0),
+        question: String(obj.prompt),
+        options: (obj.options as Record<string, unknown>[]).map((opt) => String(opt.text ?? "")),
+        correct_answer: Number(obj.correct_index ?? 0),
         explanation: String(obj.explanation ?? ""),
         bloom_level:
           typeof obj.bloom_level === "number" ? obj.bloom_level : undefined,

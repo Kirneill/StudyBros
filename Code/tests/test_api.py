@@ -166,6 +166,18 @@ def test_get_document_not_found(client):
     assert "detail" in response.json()
 
 
+def test_rename_document(client):
+    doc_id, _ = _seed_document()
+    response = client.patch(
+        f"/api/documents/{doc_id}",
+        json={"title": "Renamed Document"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == doc_id
+    assert data["title"] == "Renamed Document"
+
+
 def test_get_document_chunks(client):
     doc_id, _ = _seed_document()
     response = client.get(f"/api/documents/{doc_id}/chunks")
@@ -186,6 +198,24 @@ def test_delete_document(client):
     assert response.status_code == 404
 
 
+def test_bulk_delete_documents(client):
+    first_doc_id, _ = _seed_document()
+    second_doc_id, _ = _seed_document()
+
+    response = client.post(
+        "/api/documents/bulk-delete",
+        json={"document_ids": [first_doc_id, second_doc_id]},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["deleted_documents"] == 2
+
+    first_check = client.get(f"/api/documents/{first_doc_id}")
+    second_check = client.get(f"/api/documents/{second_doc_id}")
+    assert first_check.status_code == 404
+    assert second_check.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # Upload
 # ---------------------------------------------------------------------------
@@ -201,6 +231,28 @@ def test_upload_text_file(client):
     data = response.json()
     assert data["title"] is not None
     assert data["id"] is not None
+
+
+def test_upload_text_file_without_trailing_slash(client):
+    content = b"This is test content for upload without redirect."
+    response = client.post(
+        "/api/upload",
+        files={"file": ("test_upload.txt", io.BytesIO(content), "text/plain")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] is not None
+    assert data["id"] is not None
+
+
+def test_upload_invalid_pdf_returns_diagnostic(client):
+    content = b"This is not a valid PDF file."
+    response = client.post(
+        "/api/upload/",
+        files={"file": ("broken.pdf", io.BytesIO(content), "application/pdf")},
+    )
+    assert response.status_code == 422
+    assert 'Upload failed during extract for "broken.pdf"' in response.json()["detail"]
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +405,51 @@ def test_record_review(client):
     assert "next_review" in data
 
 
+def test_record_review_creates_progress(client):
+    _, study_set_id = _seed_document()
+
+    review_response = client.post(
+        f"/api/study/{study_set_id}/review",
+        json={"card_index": 0, "rating": 3, "confidence": 4},
+    )
+    assert review_response.status_code == 200
+
+    progress_response = client.get("/api/study/progress")
+    assert progress_response.status_code == 200
+    data = progress_response.json()
+    assert len(data) >= 1
+    assert any(entry["topic"] == "cs" for entry in data)
+    matching = next(entry for entry in data if entry["topic"] == "cs")
+    assert matching["total_reviews"] == 1
+    assert matching["mastery_level"] > 0
+
+
+def test_get_progress_backfills_existing_reviews(client):
+    _, study_set_id = _seed_document()
+
+    with get_session_ctx() as session:
+        review = CardReview(
+            card_id=0,
+            study_set_id=study_set_id,
+            rating=3,
+            elapsed_days=0.0,
+            scheduled_days=2.0,
+            stability=1.5,
+            difficulty=4.5,
+            retrievability=0.9,
+            state="learning",
+            reviewed_at=datetime.utcnow(),
+            confidence_rating=4,
+        )
+        session.add(review)
+        session.commit()
+
+    progress_response = client.get("/api/study/progress")
+    assert progress_response.status_code == 200
+    data = progress_response.json()
+    assert any(entry["topic"] == "cs" for entry in data)
+
+
 def test_record_review_invalid_rating(client):
     _, study_set_id = _seed_document()
     response = client.post(
@@ -454,6 +551,33 @@ def test_get_schedule_with_reviews(client):
         "last_review",
         "scheduled_days",
     }
+
+
+def test_complete_study_session(client):
+    _, study_set_id = _seed_document()
+
+    response = client.post(
+        f"/api/study/{study_set_id}/session",
+        json={
+            "total_items": 2,
+            "correct_count": 1,
+            "confidence_sum": 7,
+            "bloom_level_distribution": {"1": 2},
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_items"] == 2
+    assert data["correct_count"] == 1
+    assert data["accuracy"] == 0.5
+
+    phase_response = client.get("/api/gamification/phase")
+    assert phase_response.status_code == 200
+    assert phase_response.json()["total_sessions"] == 1
+
+    consistency_response = client.get("/api/gamification/consistency")
+    assert consistency_response.status_code == 200
+    assert len(consistency_response.json()["studied_dates"]) == 1
 
 
 def test_check_mastery(client):
