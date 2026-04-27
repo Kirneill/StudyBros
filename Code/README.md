@@ -1,267 +1,261 @@
-# KSpider: AI Study Guide
-Transform learning materials into structured study assets (flashcards, quizzes, practice tests) with minimal manual work. This README file is organized as follows:
+# StudyBros
 
-    I.  Features
-    II. Prerequisites
-    III. Requirements 
-    IV. Installation (HOW TO)
-    V. Usage (COMMANDS)
-    VI. Configuration (SET UP)
-    VII. Development
-    VIII. Directory Structure
-    IX. Phase Roadmap
-    X. License
+AI-powered study platform -- transforms learning materials into flashcards, quizzes, and practice tests with spaced repetition and mastery tracking.
 
-## I. Features
-- **Multi-format Ingestion**: Process PPTX, PDF, TXT, MD files and video/audio content
-- **AI-Powered Generation**: Create flashcards, quizzes, and practice tests using OpenAI
-- **Multiple Export Formats**: JSON, Anki CSV, and Markdown
-- **SQLite Storage**: Simple, portable database for all content
-- **Cost Guardrails**: Built-in limits to control API usage
+## Features
 
-## II. Prerequisites
-- Python 3.11+
-- FFmpeg (for video/audio processing). How install is below
-- OpenAI API key. Personal key
-## III. Requirements
-### Core dependencies
-click>=8.1.0
-python-dotenv>=1.0.0
-sqlalchemy>=2.0.0
-pydantic>=2.0.0
-rich>=13.0.0
-### Document extraction
-python-pptx>=0.6.21
-pypdf>=3.0.0
+- **Multi-format ingestion** -- PDF, PPTX, TXT, MD, video, and audio
+- **AI-generated study materials** -- flashcards, quizzes, practice tests, summaries
+- **FSRS v5 spaced repetition** -- optimal review scheduling based on a power-law forgetting curve
+- **Bloom's taxonomy tracking** -- measures depth of understanding, not just recall
+- **85% difficulty targeting** -- keeps study in the optimal learning zone
+- **Science-backed gamification** -- SDT 3-phase scaffolding, mastery completion with "You Won" moments
+- **MCP server** -- works with any LLM client (Claude, ChatGPT, Cursor, etc.), no API key needed
+- **Export** -- JSON, Anki CSV, Markdown
 
-### AI/Generation
-openai>=1.0.0
+## Quick Start
 
-### Audio/Video processing
-ffmpeg-python>=0.2.0
+### MCP Setup (recommended)
 
-### Development dependencies
-pytest>=7.0.0
-pytest-cov>=4.0.0
-pytest-asyncio>=0.21.0
-ruff>=0.1.0
-mypy>=1.0.0
+Add StudyBros to your MCP client configuration (`.mcp.json`, Claude Desktop config, etc.):
 
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/studybros/Code"
+    }
+  }
+}
+```
 
-## IV. Installation
-1.  FFmpeg installation
+The connected LLM does all generation -- no OpenAI API key required.
 
-    **Windows:**
-    ```bash
-    # Using winget
-    winget install FFmpeg
+Once connected, tell your LLM:
 
-    # Or download from https://ffmpeg.org/download.html
-    ```
+1. **Ingest**: "Ingest my lecture slides at /path/to/slides.pdf"
+2. **Generate**: "Generate 20 flashcards from document 1"
+3. **Study**: "Start a flashcard session for study set 1"
+4. **Track**: "How am I doing on organic chemistry?"
 
-    **macOS:**
-    ```bash
-    brew install ffmpeg
-    ```
-
-    **Linux:**
-    ```bash
-    sudo apt install ffmpeg  # Debian/Ubuntu
-    sudo dnf install ffmpeg  # Fedora
-    ```
-
-2. Create and activate a virtual environment:
-    ```bash
-    python -m venv venv
-    # Windows
-    venv\Scripts\activate
-    # macOS/Linux
-    source venv/bin/activate
-    ```
-
-3. Install dependencies:
-    ```bash
-    make install
-    # or
-    pip install -r requirements.txt
-    ```
-
-    4. Set up environment variables:
-    ```bash
-    cp .env.example .env
-    # Edit .env and add your OpenAI API key
-    ```
-
-5. Initialize the database:
-    ```bash
-    python -m study_guide init
-    ```
-
-## V. Usage
-
-### Ingest Files
-Process a directory of learning materials:
+### CLI Setup (requires OpenAI API key)
 
 ```bash
+pip install -e ".[dev]"
+cp env.example.txt .env   # Add your OPENAI_API_KEY
+python -m study_guide init
+python -m study_guide ingest ./materials
+python -m study_guide generate flashcards --doc 1 --count 20
+```
+
+## Installation
+
+```bash
+git clone <repo-url>
+cd Code
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -e ".[dev]"
+```
+
+FFmpeg is required for video/audio ingestion:
+
+```bash
+# Windows
+winget install FFmpeg
+
+# macOS
+brew install ffmpeg
+
+# Linux (Debian/Ubuntu)
+sudo apt install ffmpeg
+```
+
+## MCP Tools Reference
+
+| Tool | Description |
+|------|-------------|
+| `ingest_file` | Ingest a single file (PDF, PPTX, TXT, MD, video, audio) into the database |
+| `ingest_directory` | Ingest all supported files from a directory |
+| `store_study_set` | Store a generated study set (flashcards, quiz, practice test, summary) |
+| `record_review` | Record a flashcard review with FSRS rating (1-4) and schedule next review |
+| `get_due_cards` | Get cards due for review, sorted by FSRS urgency (lowest retrievability first) |
+| `check_mastery` | Check if a topic meets mastery criteria (retrievability, accuracy, Bloom level) |
+| `get_strengths_weaknesses` | Analyze strengths and weaknesses across all studied topics |
+| `export_study_set` | Export a study set to JSON, Anki CSV, or Markdown |
+| `delete_document` | Delete a document and all associated chunks and study sets |
+| `delete_study_set` | Delete a study set and its review history |
+
+## MCP Resources Reference
+
+| Resource URI | Description |
+|--------------|-------------|
+| `studybros://status` | Server status, configuration, and database statistics |
+| `studybros://documents` | List all ingested documents with metadata |
+| `studybros://documents/{doc_id}/chunks` | Text chunks for a specific document |
+| `studybros://study-sets` | List all generated study sets |
+| `studybros://study-sets/{set_id}` | Full content of a specific study set |
+| `studybros://study-sets/{set_id}/schedule` | FSRS review schedule and predicted retention |
+| `studybros://progress` | Knowledge heat map: per-topic mastery, Bloom levels, consistency |
+| `studybros://progress/strengths-weaknesses` | Detailed strengths, weaknesses, and recommendations |
+| `studybros://achievements` | All earned competency achievements |
+
+## MCP Prompts Reference
+
+| Prompt | Description |
+|--------|-------------|
+| `generate_flashcards` | Generate flashcards from a document (params: document_id, count, difficulty) |
+| `generate_quiz` | Generate a multiple-choice quiz from a document |
+| `generate_practice_test` | Generate a mixed-format practice test from a document |
+| `generate_summary` | Generate an audio-friendly summary of a document |
+| `study_flashcards` | Interactive flashcard session with FSRS scheduling |
+| `take_quiz` | Interactive quiz session with scoring |
+| `explain_concept` | Explain a concept using the Feynman technique |
+| `review_progress` | Review overall study progress, achievements, and recommendations |
+
+## CLI Commands
+
+The CLI uses `python -m study_guide` as the entry point.
+
+### Ingest
+
+```bash
+# Ingest a directory of learning materials
 python -m study_guide ingest ./my_materials
 ```
 
 Supported formats: `.pptx`, `.pdf`, `.txt`, `.md`, `.mp4`, `.mov`, `.webm`
 
-### List Content
+### List
+
 ```bash
-# List all ingested documents
-python -m study_guide list documents
-
-# List chunks for a document
-python -m study_guide list chunks --doc 1
-
-# List generated study sets
-python -m study_guide list sets
+python -m study_guide list documents     # All ingested documents
+python -m study_guide list chunks --doc 1  # Chunks for a document
+python -m study_guide list sets          # All generated study sets
 ```
 
-### Generate Study Materials
+### Generate
+
 ```bash
-# Generate flashcards from a document
 python -m study_guide generate flashcards --doc 1 --count 20
-
-# Generate a quiz
 python -m study_guide generate quiz --doc 1 --count 10
-
-# Generate a practice test
 python -m study_guide generate test --doc 1 --count 15
-
-# Generate an audio-friendly summary
 python -m study_guide generate summary --doc 1 --points 7
 ```
 
 ### Export
+
 ```bash
-# Export to JSON
 python -m study_guide export 1 --format json
-
-# Export flashcards to Anki CSV
 python -m study_guide export 1 --format anki
-
-# Export quiz to Markdown
 python -m study_guide export 1 --format markdown
 ```
 
-### Check Status
+### Status
+
 ```bash
 python -m study_guide status
 ```
-## VI. Configuration
 
-SETTINGS YOU CAN CHANGE (.env file):
+## Configuration
 
-  OPENAI_API_KEY                         ← Required
-  STUDY_GUIDE_GENERATION_MODEL=gpt-4o    ← Model to use
-  STUDY_GUIDE_MAX_CHUNKS_PER_GENERATION  ← Limit chunks (cost control)
-  STUDY_GUIDE_MAX_TOKENS_PER_RESPONSE    ← Limit response size
-
-Environment variables (set in `.env`):
+Environment variables (set in `.env`, see `env.example.txt`):
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENAI_API_KEY` | OpenAI API key (required)!!! | - |
-| `STUDY_GUIDE_DB_PATH` | Database file path | `./data/study_guide.db` |
-| `STUDY_GUIDE_EXPORT_DIR` | Export directory | `./data/exports` |
-| `STUDY_GUIDE_MAX_CHUNKS_PER_GENERATION` | Max chunks per API call | `5` |
+| `OPENAI_API_KEY` | OpenAI API key (required for CLI, not for MCP) | -- |
+| `STUDY_GUIDE_DB_PATH` | SQLite database file path | `./data/study_guide.db` |
+| `STUDY_GUIDE_EXPORT_DIR` | Export output directory | `./data/exports` |
+| `STUDY_GUIDE_GENERATION_MODEL` | OpenAI model for CLI generation | `gpt-4o` |
+| `STUDY_GUIDE_TRANSCRIPTION_MODEL` | Model for audio transcription | `whisper-1` |
+| `STUDY_GUIDE_MAX_CHUNKS_PER_GENERATION` | Max chunks per API call (cost control) | `5` |
 | `STUDY_GUIDE_MAX_TOKENS_PER_RESPONSE` | Max tokens per response | `4000` |
-| `STUDY_GUIDE_GENERATION_MODEL` | GPT model for generation | `gpt-4o` |
+| `STUDY_GUIDE_AUDIO_CHUNK_SIZE_MB` | Audio chunk size for processing | `20` |
 
-## VII. Development
+## Development
 
 ```bash
-# Install dev dependencies
-make dev
-
-# Run tests
-make test
-
-# Run linter
-make lint
-
-# Format code
-make format
-```
-COST NOTES
-
-  - Each generation call uses OpenAI API credits
-  - Default limits prevent runaway costs
-  - Flashcards: ~$0.02-0.05 per set of 20
-  - Quiz: ~$0.02-0.05 per 10 questions
-  - Monitor usage at: https://platform.openai.com/usage
-
-## VIII. Directory Structure
-
+pip install -e ".[dev]"
+pytest -v --tb=short
+ruff check .
+mypy study_guide/
 ```
 
-study_guide/
-├── __init__.py
-├── __main__.py                 # CLI entry point
-├── cli.py                      # Click CLI commands
-├── config.py                   # Configuration management
-├── database/
-│   ├── __init__.py
-│   ├── models.py               # SQLAlchemy models
-│   ├── schema.py               # DB initialization
-│   └── operations.py           # CRUD operations
-├── ingestion/
-│   ├── __init__.py
-│   ├── scanner.py              # File discovery
-│   ├── extractors/
-│   │   ├── __init__.py
-│   │   ├── base.py             # Base extractor interface
-│   │   ├── pptx_extractor.py   # PowerPoint extraction
-│   │   ├── pdf_extractor.py    # PDF extraction
-│   │   ├── text_extractor.py   # TXT/MD extraction
-│   │   └── video_extractor.py  # Video → audio → transcript
-│   └── chunker.py              # Text chunking logic
-├── generation/
-│   ├── __init__.py
-│   ├── schemas.py              # Pydantic schemas for structured outputs
-│   ├── prompts.py              # Generation prompts
-│   └── generator.py            # OpenAI generation logic
-├── export/
-│   ├── __init__.py
-│   ├── json_export.py          # JSON export
-│   ├── anki_export.py          # Anki CSV export
-│   └── markdown_export.py      # Markdown export
-└── utils/
-    ├── __init__.py
-    └── audio.py                # FFmpeg audio utilities
+Or using Make:
 
-tests/
-├── __init__.py
-├── conftest.py                 # Pytest fixtures
-├── test_data/                  # Golden test inputs
-│   ├── sample.pptx
-│   ├── sample.pdf
-│   └── sample.txt
-├── test_extraction.py
-├── test_chunking.py
-├── test_generation.py
-└── test_export.py
-
-data/                           # Default data directory
-├── study_guide.db              # SQLite database
-└── exports/                    # Export output directory
-
-.env.example
-.gitignore
-Makefile
-README.md
-pyproject.toml
-                 # Database and exports
+```bash
+make install    # Install dependencies
+make test       # Run tests
+make lint       # Run linter
+make format     # Format code
 ```
 
-## IX Phase Roadmap
-- **Phase 1 (Current)**: CLI-based MVP with file ingestion, generation, and export
-- **Phase 2**: Next.js web UI for upload, browse, generate, and export
-- **Phase 3**: YouTube links, scheduling, spaced repetition, analytics, multi-user auth
+## Project Structure
 
-## X. License
+```
+Code/
+├── mcp_server/                    # MCP server (FastMCP)
+│   ├── __init__.py
+│   ├── __main__.py                # Entry point: python -m mcp_server
+│   └── server.py                  # 10 tools, 9 resources, 8 prompts
+├── study_guide/                   # Core Python library
+│   ├── __init__.py
+│   ├── __main__.py                # CLI entry point: python -m study_guide
+│   ├── cli.py                     # Click CLI commands
+│   ├── config.py                  # Configuration management
+│   ├── database/
+│   │   ├── models.py              # SQLAlchemy 2.0 models
+│   │   ├── schema.py              # DB initialization, session context
+│   │   └── operations.py          # CRUD operations
+│   ├── ingestion/
+│   │   ├── scanner.py             # File discovery
+│   │   ├── chunker.py             # Text chunking
+│   │   └── extractors/
+│   │       ├── base.py            # Base extractor interface
+│   │       ├── pdf_extractor.py   # PDF extraction
+│   │       ├── pptx_extractor.py  # PowerPoint extraction
+│   │       ├── text_extractor.py  # TXT/MD extraction
+│   │       └── video_extractor.py # Video/audio transcription
+│   ├── generation/
+│   │   ├── generator.py           # OpenAI generation (CLI)
+│   │   ├── prompts.py             # Generation prompt templates
+│   │   └── schemas.py             # Pydantic v2 output schemas
+│   ├── export/
+│   │   ├── base.py                # Base exporter interface
+│   │   ├── json_export.py         # JSON export
+│   │   ├── anki_export.py         # Anki CSV export
+│   │   └── markdown_export.py     # Markdown export
+│   ├── learning/
+│   │   ├── scheduler.py           # FSRS v5 spaced repetition algorithm
+│   │   ├── gamification.py        # SDT phases, achievements, streaks
+│   │   └── models.py              # CardReview, UserProgress models
+│   └── utils/
+│       └── audio.py               # FFmpeg audio utilities
+├── tests/
+│   ├── conftest.py                # Pytest fixtures
+│   ├── test_chunking.py
+│   ├── test_database.py
+│   ├── test_export.py
+│   ├── test_extraction.py
+│   ├── test_gamification.py
+│   ├── test_generation.py
+│   ├── test_integration.py
+│   ├── test_learning_models.py
+│   ├── test_mcp_server.py
+│   └── test_scheduler.py
+├── data/                          # SQLite database and exports
+├── pyproject.toml
+├── Makefile
+├── env.example.txt
+└── LICENSE
+```
+
+## How FSRS Works
+
+FSRS (Free Spaced Repetition Scheduler) v5 models memory with a power-law forgetting curve: `R = (1 + t / (9 * S))^(-1)`, where R is retrievability, t is elapsed days, and S is stability. After each review, the user rates 1 (Again), 2 (Hard), 3 (Good), or 4 (Easy). The algorithm updates two per-card parameters -- stability (how slowly a memory decays) and difficulty (how hard the card is to learn) -- then schedules the next review at the point where retrievability would drop to 90%. A topic is considered mastered when all cards maintain >90% retrievability at >30-day intervals with >85% accuracy and Bloom Level 3+ understanding.
+
+## License
 
 MIT
