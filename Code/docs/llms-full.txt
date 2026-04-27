@@ -1,0 +1,987 @@
+# StudyBros -- Complete Documentation
+
+> Paste this entire file into your LLM conversation to get full context on StudyBros.
+
+## Overview
+
+StudyBros is an AI-powered study platform that transforms learning materials into flashcards, quizzes, practice tests, and audio summaries. It is built as an MCP (Model Context Protocol) server, meaning any LLM client that supports MCP can connect to it -- Claude Code, Claude Desktop, or any other compatible client.
+
+The architecture is MCP-first: the LLM provides the intelligence (generation, interaction, explanation), while StudyBros provides the data layer, file ingestion, spaced repetition scheduling (FSRS v5), progress tracking, and gamification. No API key is needed for the MCP server itself.
+
+Key capabilities: ingest documents (PDF, PPTX, TXT, MD, video, audio), generate structured study materials, run interactive study sessions with FSRS spaced repetition, track mastery via Bloom's taxonomy levels, and provide gamification with three-phase scaffolding (habit, competence, intrinsic motivation). The server uses SQLite for persistence -- zero configuration required.
+
+---
+
+## Quick Start
+
+Get StudyBros running in under 2 minutes.
+
+### 1. Install
+
+```bash
+cd /path/to/studybros/Code
+pip install -e .
+```
+
+### 2. Configure your MCP client
+
+Add this to your MCP client configuration (e.g., `.mcp.json`, `claude_desktop_config.json`, or equivalent):
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/studybros/Code"
+    }
+  }
+}
+```
+
+Replace `/path/to/studybros/Code` with the actual path to the `Code` directory.
+
+### 3. Ingest a document
+
+Tell your LLM:
+
+> Ingest /path/to/my/notes.pdf
+
+The server extracts text, chunks it, and stores it in the database. You get back a document ID.
+
+### 4. Generate study materials
+
+> Generate 20 flashcards from document 1
+
+The LLM reads your document content via a prompt, generates flashcards, and stores them as a study set. You get back a study set ID.
+
+### 5. Study with spaced repetition
+
+> Start a flashcard study session for study set 1
+
+The LLM presents cards ordered by FSRS urgency, collects your answers, records reviews, and tells you when each card is due next.
+
+### 6. Track progress
+
+> How am I doing?
+
+The LLM reads your progress data and presents strengths, weaknesses, mastery levels, consistency streaks, and recommendations.
+
+### What just happened
+
+- **Ingest** extracted and chunked your document into the SQLite database
+- **Generate** used the document chunks as context for the LLM to produce structured flashcards
+- **Study** ran an interactive session with FSRS spaced repetition scheduling each card
+- **Progress** analyzed your review history to show mastery and recommend next steps
+
+No API keys are needed for the MCP server itself. The LLM client provides the intelligence; StudyBros provides the data, scheduling, and tracking.
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Python 3.11+** (required)
+- **FFmpeg** (optional, for video/audio file ingestion)
+
+### Install StudyBros
+
+```bash
+git clone https://github.com/your-org/studybros.git
+cd studybros/Code
+pip install -e ".[dev]"
+```
+
+The `.[dev]` extra includes pytest, ruff, and mypy for development. For production use, `pip install -e .` is sufficient.
+
+### Verify installation
+
+```bash
+python -c "from mcp_server.server import mcp; print(mcp.name)"
+```
+
+Expected output:
+
+```
+studybros
+```
+
+You can also start the server directly:
+
+```bash
+python -m mcp_server
+```
+
+This launches the MCP server on stdio transport. It will wait for MCP protocol messages -- you will not see output unless an MCP client connects.
+
+### FFmpeg (optional)
+
+FFmpeg is only needed if you want to ingest video or audio files (`.mp4`, `.mov`, `.mp3`, `.wav`, etc.). Document formats (PDF, PPTX, TXT, MD) work without it.
+
+#### Windows
+
+```bash
+winget install Gyan.FFmpeg
+```
+
+Or download from https://ffmpeg.org/download.html and add to PATH.
+
+#### macOS
+
+```bash
+brew install ffmpeg
+```
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt install ffmpeg
+```
+
+### Environment variables (optional)
+
+All environment variables are optional for MCP server usage. The server uses the connected LLM client for generation -- no API key is needed.
+
+| Variable | Default | Description |
+|---|---|---|
+| `STUDY_GUIDE_DB_PATH` | `data/study_guide.db` | SQLite database path |
+| `STUDY_GUIDE_EXPORT_DIR` | `data/exports` | Directory for exported files |
+| `OPENAI_API_KEY` | (none) | Only needed for the standalone CLI, not for MCP |
+| `STUDY_GUIDE_GENERATION_MODEL` | `gpt-4o` | Model name for CLI generation |
+
+### Supported file types
+
+| Category | Extensions |
+|---|---|
+| Documents | `.pdf`, `.pptx`, `.txt`, `.md`, `.markdown`, `.text` |
+| Video | `.mp4`, `.mov`, `.webm`, `.avi`, `.mkv` |
+| Audio | `.mp3`, `.wav`, `.m4a`, `.aac`, `.ogg` |
+
+Video and audio files require FFmpeg for transcription.
+
+### Database
+
+StudyBros uses SQLite. The database is created automatically on first use at `data/study_guide.db` (relative to the `Code` directory). No setup required.
+
+---
+
+## Tools Reference
+
+StudyBros exposes 10 MCP tools. All tools return a string -- either a success message or a JSON-encoded result. Errors are returned as strings prefixed with `"Error: "`.
+
+### ingest_file
+
+Ingest a single file into StudyBros. Extracts text, chunks it, and stores it in the database.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `file_path` | string | yes | Absolute path to the file to ingest |
+
+**Returns:** Summary string with word count, chunk count, and document ID.
+
+**Example:** "Ingest the file at /home/user/notes/chapter1.pdf"
+
+**Supported formats:** PDF, PPTX, TXT, MD, video, audio. Video/audio require FFmpeg.
+
+**Deduplication:** Files are hashed. Re-ingesting the same file is a no-op.
+
+### ingest_directory
+
+Ingest all supported files from a directory.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `directory_path` | string | yes | Absolute path to the directory |
+| `skip_existing` | boolean | no (default: true) | Skip files already ingested (by hash) |
+
+**Returns:** Summary string with counts of processed, skipped, and failed files.
+
+**Example:** "Ingest all files from /home/user/lectures"
+
+### store_study_set
+
+Store a generated study set. The LLM generates the content (via a prompt); this tool persists it.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the source document |
+| `set_type` | string | yes | One of: `flashcards`, `quiz`, `practice_test`, `audio_summary` |
+| `title` | string | yes | Descriptive title for the study set |
+| `content_json` | string | yes | JSON string matching the schema for the given set_type |
+
+**Returns:** Confirmation with study set ID and item count.
+
+**Schemas:**
+
+Flashcards (`set_type="flashcards"`):
+```json
+{
+  "cards": [
+    {
+      "question": "What is...",
+      "answer": "It is...",
+      "tags": ["topic1"],
+      "difficulty": "easy|medium|hard"
+    }
+  ]
+}
+```
+
+Quiz (`set_type="quiz"`):
+```json
+{
+  "questions": [
+    {
+      "prompt": "Which of the following...",
+      "options": [{"label": "A", "text": "..."}, {"label": "B", "text": "..."}],
+      "correct_index": 0,
+      "explanation": "Because..."
+    }
+  ]
+}
+```
+
+Practice test (`set_type="practice_test"`):
+```json
+{
+  "title": "Chapter 5 Test",
+  "questions": [
+    {
+      "question_type": "multiple_choice|short_answer|true_false",
+      "prompt": "...",
+      "options": [{"label": "A", "text": "..."}],
+      "correct_answer": "...",
+      "explanation": "...",
+      "points": 1
+    }
+  ],
+  "total_points": 15
+}
+```
+
+Audio summary (`set_type="audio_summary"`):
+```json
+{
+  "title": "...",
+  "overview": "2-3 sentence overview",
+  "key_concepts": [
+    {"concept": "...", "explanation": "...", "importance": "essential|important|supplementary"}
+  ],
+  "main_points": ["point as a sentence", "..."],
+  "conclusion": "...",
+  "estimated_read_time_seconds": 120
+}
+```
+
+### record_review
+
+Record a flashcard review for FSRS spaced repetition scheduling.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `study_set_id` | integer | yes | ID of the study set |
+| `card_index` | integer | yes | Zero-based index of the card in the set |
+| `rating` | integer | yes | 1=Again, 2=Hard, 3=Good, 4=Easy |
+| `confidence` | integer | no (default: 0) | Self-reported confidence 1-5 (0 to skip) |
+
+**Returns:** Next review date, stability value, and card state.
+
+**Example:** After a user rates a card as "Good", call `record_review(study_set_id=1, card_index=3, rating=3)`.
+
+### get_due_cards
+
+Get cards due for review in a study set, ordered by FSRS urgency.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `study_set_id` | integer | yes | ID of the study set |
+
+**Returns:** JSON string with `due_count` and `cards` array. Cards are sorted by lowest retrievability (most urgent first). Each card includes `card_id`, `retrievability`, `state`, and `last_review`.
+
+**Example:** "Which cards are due for review in study set 1?"
+
+### check_mastery
+
+Check if a topic is mastered.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `topic` | string | yes | Topic tag to check |
+
+**Returns:** JSON string with mastery status and detailed breakdown.
+
+**Mastery criteria (all must be met):**
+- All cards: current retrievability > 90%
+- All cards: most recent scheduled interval > 30 days
+- Average accuracy over last 3 reviews per card > 85%
+- Bloom's taxonomy level >= 3 (Apply)
+
+**Example:** "Have I mastered the topic 'data structures'?"
+
+### get_strengths_weaknesses
+
+Analyze strengths and weaknesses across all studied topics.
+
+**Parameters:** None.
+
+**Returns:** JSON string with:
+- `strengths`: topics with > 80% accuracy and Bloom level >= 3
+- `weaknesses`: topics with < 70% accuracy or Bloom level < 2
+- `recommendations`: specific study actions
+- `calibration`: confidence vs. actual accuracy comparison
+
+**Example:** "What are my strengths and weaknesses?"
+
+### export_study_set
+
+Export a study set to a file.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `study_set_id` | integer | yes | ID of the study set |
+| `format` | string | no (default: "json") | Export format: `json`, `anki`, or `markdown` |
+
+**Returns:** File path of the exported file.
+
+**Example:** "Export study set 1 as an Anki deck"
+
+### delete_document
+
+Delete a document and all associated data (chunks, study sets).
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the document to delete |
+
+**Returns:** Confirmation message.
+
+**Example:** "Delete document 3 and all its study materials"
+
+### delete_study_set
+
+Delete a study set and its review history.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `study_set_id` | integer | yes | ID of the study set to delete |
+
+**Returns:** Confirmation message.
+
+**Example:** "Delete study set 5"
+
+---
+
+## Resources Reference
+
+StudyBros exposes 9 MCP resources. Resources are read-only data endpoints accessed by URI. All return JSON-encoded strings.
+
+### studybros://status
+
+Server status, configuration, and database statistics.
+
+**Returns:**
+```json
+{
+  "version": "0.1.0",
+  "db_path": "/path/to/data/study_guide.db",
+  "generation_model": "gpt-4o",
+  "stats": {
+    "documents": 5,
+    "study_sets": 12,
+    "chunks": 87
+  }
+}
+```
+
+### studybros://documents
+
+All ingested documents with metadata.
+
+**Returns:**
+```json
+[
+  {
+    "id": 1,
+    "title": "Chapter 1 - Introduction",
+    "word_count": 3420,
+    "chunk_count": 8,
+    "created_at": "2025-01-15T10:30:00"
+  }
+]
+```
+
+### studybros://documents/{doc_id}/chunks
+
+All text chunks for a specific document. Used as context for study material generation.
+
+**URI parameter:** `doc_id` -- integer document ID.
+
+**Returns:**
+```json
+[
+  {
+    "chunk_index": 0,
+    "content": "The first section of text...",
+    "char_count": 1500
+  }
+]
+```
+
+### studybros://study-sets
+
+All generated study sets.
+
+**Returns:**
+```json
+[
+  {
+    "id": 1,
+    "type": "flashcards",
+    "title": "Chapter 1 Flashcards",
+    "item_count": 20,
+    "document_id": 1,
+    "created_at": "2025-01-15T11:00:00"
+  }
+]
+```
+
+### studybros://study-sets/{set_id}
+
+A specific study set with its full content (all cards/questions).
+
+**URI parameter:** `set_id` -- integer study set ID.
+
+**Returns:**
+```json
+{
+  "id": 1,
+  "type": "flashcards",
+  "title": "Chapter 1 Flashcards",
+  "item_count": 20,
+  "document_id": 1,
+  "created_at": "2025-01-15T11:00:00",
+  "content": {
+    "cards": [
+      {
+        "question": "What is...",
+        "answer": "It is...",
+        "tags": ["intro"],
+        "difficulty": "medium"
+      }
+    ]
+  }
+}
+```
+
+### studybros://study-sets/{set_id}/schedule
+
+FSRS review schedule for a study set. Shows due cards and predicted retention for all reviewed cards.
+
+**URI parameter:** `set_id` -- integer study set ID.
+
+**Returns:**
+```json
+{
+  "study_set_id": 1,
+  "due_count": 3,
+  "due_cards": [
+    {
+      "card_id": 5,
+      "retrievability": 0.72,
+      "state": "review",
+      "last_review": "2025-01-14T09:00:00"
+    }
+  ],
+  "all_cards": [
+    {
+      "card_id": 5,
+      "retrievability": 0.72,
+      "stability": 4.2,
+      "state": "review",
+      "last_review": "2025-01-14T09:00:00",
+      "scheduled_days": 5.0
+    }
+  ]
+}
+```
+
+Cards in `due_cards` have retrievability below the 90% target. `all_cards` includes every reviewed card sorted by retrievability (lowest first).
+
+### studybros://progress
+
+Knowledge heat map with per-topic mastery, Bloom levels, consistency, and gamification phase.
+
+**Returns:**
+```json
+{
+  "topics": [
+    {
+      "topic": "data structures",
+      "mastery_level": 0.85,
+      "bloom_highest_level": 3,
+      "total_reviews": 45,
+      "last_reviewed_at": "2025-01-15T10:00:00",
+      "calibration_score": 0.92,
+      "consistency_pct_30d": 71.4
+    }
+  ],
+  "consistency": {
+    "current_streak": 5,
+    "longest_streak": 12,
+    "days_active_last_30": 20
+  },
+  "phase": {
+    "phase": "competence",
+    "description": "Building deep understanding",
+    "weeks_active": 8
+  }
+}
+```
+
+**Gamification phases:**
+- **Habit** (weeks 1-4): Building study routine
+- **Competence** (months 2-3): Deepening understanding
+- **Intrinsic** (month 4+): Self-directed mastery
+
+### studybros://progress/strengths-weaknesses
+
+Detailed strengths, weaknesses, and study recommendations.
+
+**Returns:**
+```json
+{
+  "strengths": [
+    {
+      "topic": "algorithms",
+      "accuracy": 0.92,
+      "bloom_level": 4
+    }
+  ],
+  "weaknesses": [
+    {
+      "topic": "operating systems",
+      "accuracy": 0.61,
+      "bloom_level": 1
+    }
+  ],
+  "recommendations": [
+    "Focus on operating systems -- accuracy is below 70%",
+    "Review data structures cards that are overdue"
+  ],
+  "calibration": {
+    "overconfident_topics": ["networking"],
+    "underconfident_topics": []
+  }
+}
+```
+
+### studybros://achievements
+
+All earned competency badges. Achievements require demonstrated Bloom level, not just participation.
+
+**Returns:**
+```json
+[
+  {
+    "name": "Data Structures Master",
+    "topic": "data structures",
+    "earned_at": "2025-01-15T10:00:00",
+    "criteria": "Bloom level 4+, accuracy > 90%, 30-day retention"
+  }
+]
+```
+
+---
+
+## Prompts Reference
+
+StudyBros exposes 8 MCP prompts. Prompts provide structured instructions and context to the LLM. Some prompts instruct the LLM to call tools as a follow-up action.
+
+### generate_flashcards
+
+Generate flashcards from a document's content.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the source document |
+| `count` | integer | no (default: 10) | Number of flashcards to generate |
+| `difficulty` | string | no (default: "mixed") | Target difficulty: `easy`, `medium`, `hard`, or `mixed` |
+
+**Behavior:** Loads the document's text chunks, constructs a generation prompt with the flashcard JSON schema, and instructs the LLM to generate flashcards and then call `store_study_set` to persist them.
+
+**Expected LLM follow-up:** Call `store_study_set(document_id=<id>, set_type="flashcards", title=<title>, content_json=<generated JSON>)`.
+
+**Example:** "Generate 20 hard flashcards from document 1"
+
+### generate_quiz
+
+Generate a multiple-choice quiz from a document.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the source document |
+| `count` | integer | no (default: 10) | Number of questions |
+
+**Behavior:** Loads document chunks, provides the quiz JSON schema, and instructs the LLM to generate questions with options, correct answers, and explanations.
+
+**Expected LLM follow-up:** Call `store_study_set(document_id=<id>, set_type="quiz", title=<title>, content_json=<generated JSON>)`.
+
+**Example:** "Create a 15-question quiz from document 2"
+
+### generate_practice_test
+
+Generate a practice test with mixed question types (multiple choice, short answer, true/false).
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the source document |
+| `count` | integer | no (default: 15) | Number of questions |
+
+**Behavior:** Same as quiz generation but with mixed question types and point values.
+
+**Expected LLM follow-up:** Call `store_study_set(document_id=<id>, set_type="practice_test", title=<title>, content_json=<generated JSON>)`.
+
+**Example:** "Generate a practice test with 20 questions from document 3"
+
+### generate_summary
+
+Generate an audio-friendly summary of a document.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the source document |
+
+**Behavior:** Loads document chunks and instructs the LLM to produce a structured summary with overview, key concepts, main points, and conclusion -- designed for reading aloud or TTS playback.
+
+**Expected LLM follow-up:** Call `store_study_set(document_id=<id>, set_type="audio_summary", title=<title>, content_json=<generated JSON>)`.
+
+**Example:** "Summarize document 1 for audio playback"
+
+### study_flashcards
+
+Run an interactive flashcard study session with FSRS spaced repetition.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `study_set_id` | integer | yes | ID of the flashcard study set |
+
+**Behavior:** Loads the study set's cards and FSRS due-card data. Instructs the LLM to:
+
+1. Present due cards first (lowest retrievability = most urgent)
+2. Show the question and wait for the user's answer
+3. Reveal the correct answer and evaluate correctness
+4. Ask the user to rate: Again (1) / Hard (2) / Good (3) / Easy (4)
+5. Call `record_review` with the rating
+6. Report the next review date
+7. Summarize the session at the end
+
+**Example:** "Let's study -- start a flashcard session for study set 1"
+
+### take_quiz
+
+Run an interactive quiz session with scoring.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `study_set_id` | integer | yes | ID of the quiz study set |
+
+**Behavior:** Loads the quiz questions. Instructs the LLM to:
+
+1. Present one question at a time with options
+2. Wait for the user's answer
+3. Reveal if correct/incorrect with explanation
+4. Track score throughout
+5. Show final score and missed questions at the end
+6. Suggest topics to review based on missed questions
+
+**Example:** "I want to take the quiz for study set 2"
+
+### explain_concept
+
+Explain a concept using the Feynman technique, grounded in document content.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `document_id` | integer | yes | ID of the source document |
+| `concept` | string | yes | The concept to explain |
+
+**Behavior:** Loads the document's text as context. Instructs the LLM to explain the concept as if teaching a beginner: simple language, analogies, concrete examples, common misconceptions, and a self-test question.
+
+**Example:** "Explain 'binary search trees' using document 1 as reference"
+
+### review_progress
+
+Generate a study progress report with strengths, weaknesses, and recommendations.
+
+**Parameters:** None.
+
+**Behavior:** Loads all progress data (topics, mastery levels, Bloom levels, review counts), strengths/weaknesses analysis, achievements, consistency streaks, and gamification phase. Instructs the LLM to present a report covering:
+
+1. Overall progress overview
+2. Current gamification phase
+3. Strengths and weaknesses
+4. Specific recommendations
+5. Consistency streak
+6. Earned achievements
+7. Confidence calibration notes
+8. Suggested next study action
+
+**Example:** "Show me my study progress report"
+
+---
+
+## Example: Claude Code Setup
+
+Claude Code auto-discovers MCP servers from `.mcp.json` in the project root. StudyBros ships with this file already configured.
+
+### Setup
+
+```bash
+cd /path/to/studybros/Code
+pip install -e .
+```
+
+That's it. The `.mcp.json` in the `Code` directory tells Claude Code how to start the server:
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "."
+    }
+  }
+}
+```
+
+Claude Code will start the StudyBros MCP server automatically when you open the project.
+
+### Example conversations
+
+**Ingest lecture notes:**
+> Ingest all my lecture notes from ./lectures
+
+Claude Code calls `ingest_directory` with the path. You get back a summary of how many files were processed.
+
+**Generate flashcards:**
+> Generate flashcards for document 1
+
+Claude Code uses the `generate_flashcards` prompt, reads the document content, generates cards, and calls `store_study_set` to save them.
+
+**Study session:**
+> Let's study -- start a flashcard session for study set 1
+
+Claude Code loads the `study_flashcards` prompt, presents cards ordered by FSRS urgency, and records your ratings via `record_review`.
+
+**Check mastery:**
+> Check my mastery on all topics
+
+Claude Code calls `check_mastery` or reads `studybros://progress` to show your mastery levels, Bloom taxonomy progress, and recommendations.
+
+**Export for Anki:**
+> Export study set 1 as an Anki deck
+
+Claude Code calls `export_study_set(study_set_id=1, format="anki")` and returns the file path.
+
+**Review progress:**
+> Show me my study progress report
+
+Claude Code uses the `review_progress` prompt and presents your strengths, weaknesses, consistency streak, achievements, and next steps.
+
+### Verify the server is running
+
+Ask Claude Code:
+> What MCP tools do you have from StudyBros?
+
+It should list all 10 tools. If not, check that `pip install -e .` completed without errors and that your working directory is the `Code` folder.
+
+---
+
+## Example: Claude Desktop Setup
+
+Add StudyBros to Claude Desktop by editing the configuration file.
+
+### 1. Install StudyBros
+
+```bash
+cd /path/to/studybros/Code
+pip install -e .
+```
+
+### 2. Edit Claude Desktop config
+
+Open your Claude Desktop configuration file:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add the `studybros` server:
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/studybros/Code"
+    }
+  }
+}
+```
+
+Replace `/path/to/studybros/Code` with the actual absolute path to the `Code` directory.
+
+**Windows path example:**
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "C:\\Users\\you\\projects\\studybros\\Code"
+    }
+  }
+}
+```
+
+### 3. Restart Claude Desktop
+
+Close and reopen Claude Desktop. The StudyBros server will start automatically.
+
+### 4. Verify
+
+Ask Claude:
+> What tools do you have from StudyBros?
+
+You should see all 10 tools listed. Then try:
+> Ingest the file at C:\Users\you\notes\chapter1.pdf
+
+### Troubleshooting
+
+**Server not appearing:** Confirm the `cwd` path points to the directory containing `mcp_server/`. The server is launched as `python -m mcp_server` from that directory.
+
+**Python not found:** Use the full path to your Python executable:
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "C:\\Users\\you\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "args": ["-m", "mcp_server"],
+      "cwd": "C:\\Users\\you\\projects\\studybros\\Code"
+    }
+  }
+}
+```
+
+**Module not found:** Make sure you ran `pip install -e .` in the `Code` directory using the same Python that Claude Desktop is configured to use.
+
+---
+
+## Example: Any MCP Client Setup
+
+StudyBros uses the stdio transport. Any MCP-compatible client can connect by spawning the server process.
+
+### How it works
+
+The MCP client starts a subprocess:
+
+```
+python -m mcp_server
+```
+
+The working directory must be the `Code` directory (where `mcp_server/` and `study_guide/` live). The server communicates over stdin/stdout using the MCP JSON-RPC protocol.
+
+### Generic JSON config
+
+Most MCP clients accept a configuration like this:
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/studybros/Code"
+    }
+  }
+}
+```
+
+**Key fields:**
+- `command`: The Python executable. Use `python3` on systems where `python` points to Python 2. Use a full path if the executable is not on PATH.
+- `args`: Always `["-m", "mcp_server"]`. This runs the `mcp_server` package as a module.
+- `cwd`: Absolute path to the `Code` directory. This is required so Python can find the `mcp_server` and `study_guide` packages.
+
+### Manual testing
+
+You can test the server manually by piping MCP protocol messages:
+
+```bash
+cd /path/to/studybros/Code
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1"}}}' | python -m mcp_server
+```
+
+### Server capabilities
+
+Once connected, the client has access to:
+
+- **10 tools**: ingest_file, ingest_directory, store_study_set, record_review, get_due_cards, check_mastery, get_strengths_weaknesses, export_study_set, delete_document, delete_study_set
+- **9 resources**: status, documents, chunks, study sets, schedules, progress, strengths/weaknesses, achievements
+- **8 prompts**: generate_flashcards, generate_quiz, generate_practice_test, generate_summary, study_flashcards, take_quiz, explain_concept, review_progress
+
+### Environment
+
+No environment variables are required. The server creates a SQLite database at `data/study_guide.db` relative to `cwd` on first use.
+
+Optional environment variables can be passed via the `env` field:
+
+```json
+{
+  "mcpServers": {
+    "studybros": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/studybros/Code",
+      "env": {
+        "STUDY_GUIDE_DB_PATH": "/custom/path/study.db"
+      }
+    }
+  }
+}
+```

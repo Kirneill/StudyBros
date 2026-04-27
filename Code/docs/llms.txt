@@ -1,0 +1,17 @@
+# StudyBros
+
+> AI-powered study platform with MCP server. Ingest documents, generate flashcards/quizzes, study with FSRS spaced repetition, track mastery.
+
+## Docs
+
+- [Quick Start](quick-start.md): Get started in 2 minutes
+- [Installation](install.md): Full installation guide
+- [Tools Reference](tools.md): All 10 MCP tools
+- [Resources Reference](resources.md): All 9 MCP resources
+- [Prompts Reference](prompts.md): All 8 MCP prompts
+
+## Examples
+
+- [Claude Code Setup](examples/claude-code-setup.md): Use with Claude Code
+- [Claude Desktop Setup](examples/claude-desktop-setup.md): Use with Claude Desktop
+- [Any MCP Client](examples/generic-mcp-setup.md): Use with any MCP-compatible client
