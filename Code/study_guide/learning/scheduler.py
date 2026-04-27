@@ -154,6 +154,9 @@ def schedule_card(
             "next_review": datetime,
         }
     """
+    if rating < 1 or rating > 4:
+        raise ValueError(f"rating must be 1-4, got {rating}")
+
     if now is None:
         now = datetime.utcnow()
 
@@ -208,14 +211,15 @@ def get_due_cards(
 
     desired_retention = FSRS_DEFAULTS["desired_retention"]
 
-    # Subquery: latest review id per card
+    # Subquery: latest review id per (card_id, study_set_id)
     latest_sub = (
         session.query(
             CardReview.card_id,
+            CardReview.study_set_id,
             sa_func.max(CardReview.id).label("max_id"),
         )
         .filter(CardReview.study_set_id == study_set_id)
-        .group_by(CardReview.card_id)
+        .group_by(CardReview.card_id, CardReview.study_set_id)
         .subquery()
     )
 
@@ -225,6 +229,8 @@ def get_due_cards(
             latest_sub,
             and_(
                 CardReview.card_id == latest_sub.c.card_id,
+                CardReview.study_set_id
+                == latest_sub.c.study_set_id,
                 CardReview.id == latest_sub.c.max_id,
             ),
         )

@@ -82,6 +82,19 @@ class TestInitialParameters:
 # schedule_card — new cards
 # ---------------------------------------------------------------------------
 
+class TestScheduleRatingValidation:
+
+    def test_schedule_card_rating_too_low(self):
+        """Rating 0 should raise ValueError."""
+        with pytest.raises(ValueError, match="rating must be 1-4"):
+            schedule_card(history=None, rating=0)
+
+    def test_schedule_card_rating_too_high(self):
+        """Rating 5 should raise ValueError."""
+        with pytest.raises(ValueError, match="rating must be 1-4"):
+            schedule_card(history=None, rating=5)
+
+
 class TestScheduleNewCard:
 
     def test_schedule_new_card_good(self):

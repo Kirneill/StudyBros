@@ -86,9 +86,8 @@ ACHIEVEMENT_DEFS = {
 def detect_phase(session: Session) -> dict:
     """Detect which gamification phase the user is in.
 
-    Phase 1: total_sessions < 20 OR consistency < 50%
-    Phase 2: total_sessions >= 20 AND avg_accuracy > 70% AND no strong
-             intrinsic signals
+    Phase 1: total_sessions < 20 OR avg_accuracy <= 70%
+    Phase 2: total_sessions >= 20 AND avg_accuracy > 70%
     Phase 3: total_sessions >= 40 AND strong intrinsic signals
     """
     total_sessions = session.query(sa_func.count(StudySession.id)).scalar() or 0
@@ -121,7 +120,7 @@ def detect_phase(session: Session) -> dict:
 
     if total_sessions >= 40 and strong_intrinsic:
         phase = 3
-    elif total_sessions >= 20 and avg_accuracy_30d > 0.70 and not strong_intrinsic:
+    elif total_sessions >= 20 and avg_accuracy_30d > 0.70:
         phase = 2
     else:
         phase = 1
@@ -140,7 +139,7 @@ def detect_phase(session: Session) -> dict:
         state.total_sessions = total_sessions
         state.avg_accuracy_30d = avg_accuracy_30d
         state.intrinsic_signals = json.dumps(intrinsic)
-    session.commit()
+    session.flush()
 
     return {
         "phase": phase,
@@ -178,12 +177,26 @@ def check_topic_completion(session: Session, topic_tag: str) -> dict:
             "achievement_earned": None,
         }
 
-    # Gather topic sessions for stats
-    topic_sessions = (
-        session.query(StudySession)
-        .filter(StudySession.study_set_id.isnot(None))
+    # Gather topic sessions for stats — filter by study sets
+    # linked to the same document as this topic's progress
+    from study_guide.database.models import StudySet
+
+    relevant_set_ids = [
+        sid for (sid,) in session.query(StudySet.id)
+        .filter(StudySet.document_id == progress.document_id)
         .all()
-    )
+    ] if progress.document_id else []
+
+    if relevant_set_ids:
+        topic_sessions = (
+            session.query(StudySession)
+            .filter(
+                StudySession.study_set_id.in_(relevant_set_ids)
+            )
+            .all()
+        )
+    else:
+        topic_sessions = []
 
     total_items = sum(s.total_items for s in topic_sessions)
     total_correct = sum(s.correct_count for s in topic_sessions)
@@ -197,8 +210,25 @@ def check_topic_completion(session: Session, topic_tag: str) -> dict:
         else:
             bloom_breakdown[label] = 0
 
-    avg_interval = details.get("avg_interval_days", 0.0)
     total_cards = details.get("total_cards", 0)
+
+    # Compute avg_interval from latest CardReview scheduled_days
+    # for this topic (check_mastery never provides avg_interval_days)
+    avg_interval = 0.0
+    if relevant_set_ids:
+        latest_reviews_for_avg = (
+            session.query(CardReview.scheduled_days)
+            .filter(
+                CardReview.study_set_id.in_(relevant_set_ids)
+            )
+            .order_by(CardReview.id.desc())
+            .limit(total_cards if total_cards > 0 else 10)
+            .all()
+        )
+        if latest_reviews_for_avg:
+            avg_interval = sum(
+                r.scheduled_days for r in latest_reviews_for_avg
+            ) / len(latest_reviews_for_avg)
 
     # Strengths and weaknesses based on mastery criteria
     strengths = []
@@ -265,13 +295,28 @@ def get_strengths_weaknesses(session: Session) -> dict:
 
     for prog in all_progress:
         # Get accuracy from recent sessions for this topic
-        topic_sessions = (
-            session.query(StudySession)
-            .filter(StudySession.study_set_id.isnot(None))
-            .order_by(StudySession.started_at.desc())
-            .limit(5)
+        from study_guide.database.models import StudySet
+
+        relevant_set_ids = [
+            sid for (sid,) in session.query(StudySet.id)
+            .filter(StudySet.document_id == prog.document_id)
             .all()
-        )
+        ] if prog.document_id else []
+
+        if relevant_set_ids:
+            topic_sessions = (
+                session.query(StudySession)
+                .filter(
+                    StudySession.study_set_id.in_(
+                        relevant_set_ids
+                    )
+                )
+                .order_by(StudySession.started_at.desc())
+                .limit(5)
+                .all()
+            )
+        else:
+            topic_sessions = []
         total_items = sum(s.total_items for s in topic_sessions)
         total_correct = sum(s.correct_count for s in topic_sessions)
         accuracy = total_correct / total_items if total_items > 0 else 0.0
@@ -335,10 +380,19 @@ def get_strengths_weaknesses(session: Session) -> dict:
 
         # Per-topic calibration
         for prog in all_progress:
+            # Get relevant study set IDs for this topic
+            topic_set_ids = [
+                sid for (sid,) in session.query(StudySet.id)
+                .filter(
+                    StudySet.document_id == prog.document_id
+                )
+                .all()
+            ] if prog.document_id else []
+
+            topic_set_id_set = set(topic_set_ids)
             topic_reviews = [
                 r for r in reviews_with_confidence
-                # We can't directly filter by topic from CardReview,
-                # so this is a simplified cross-check
+                if r.study_set_id in topic_set_id_set
             ]
             if not topic_reviews:
                 continue
@@ -685,7 +739,7 @@ def _try_award(
         earned_at=datetime.utcnow(),
     )
     session.add(achievement)
-    session.commit()
+    session.flush()
 
     return [{
         "title": achievement.title,

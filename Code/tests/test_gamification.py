@@ -172,6 +172,32 @@ class TestDetectPhase:
         assert updated.phase == result["phase"]
         assert updated.total_sessions == 25
 
+    def test_detect_phase_strong_intrinsic_mid_sessions(self, test_db):
+        """User with 25 sessions + strong intrinsic should be Phase 2."""
+        _make_sessions(test_db, 25, accuracy=0.85)
+
+        # Seed strong intrinsic signals
+        state = GamificationState(
+            phase=1,
+            total_sessions=25,
+            avg_accuracy_30d=0.85,
+            intrinsic_signals=json.dumps({
+                "beyond_goal": 6,
+                "voluntary_hard": 4,
+                "ahead_schedule": 5,
+            }),
+        )
+        test_db.add(state)
+        test_db.commit()
+
+        result = detect_phase(test_db)
+
+        # Should be Phase 2 (not Phase 1) because sessions >= 20
+        # and accuracy > 70%, even though intrinsic signals are
+        # strong (not enough sessions for Phase 3)
+        assert result["phase"] == 2
+        assert result["phase_name"] == "Growing Competence"
+
 
 # ---------------------------------------------------------------------------
 # Topic completion

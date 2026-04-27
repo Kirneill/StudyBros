@@ -45,6 +45,9 @@ def get_session_ctx():
     session = get_session_factory()()
     try:
         yield session
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
 
