@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Background */
+  --color-bg-primary: #1A1A2E;
+  --color-bg-secondary: #16213E;
+  --color-bg-card: #232342;
+  --color-bg-card-hover: #2A2A52;
+  --color-bg-input: #1E1E3A;
+
+  /* Text */
+  --color-text-primary: #F5F0EB;
+  --color-text-secondary: #B8B4AF;
+  --color-text-muted: #6B6B7B;
+
+  /* Accent */
+  --color-accent: #00D4AA;
+  --color-accent-hover: #00B894;
+  --color-accent-light: rgba(0, 212, 170, 0.1);
+  --color-accent-glow: rgba(0, 212, 170, 0.3);
+
+  /* Mastery states */
+  --color-mastery-none: #4B5563;
+  --color-mastery-learning: #F59E0B;
+  --color-mastery-review: #3B82F6;
+  --color-mastery-mastered: #22C55E;
+  --color-mastery-gold: #EAB308;
+
+  /* Bloom levels */
+  --color-bloom-remember: #60A5FA;
+  --color-bloom-understand: #34D399;
+  --color-bloom-apply: #FBBF24;
+  --color-bloom-analyze: #F87171;
+
+  /* Status */
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
+  --color-info: #60A5FA;
+
+  /* Borders */
+  --color-border: rgba(245, 240, 235, 0.08);
+  --color-border-active: rgba(0, 212, 170, 0.3);
+
+  /* Fonts */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Base styles */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-bg-primary text-text-primary antialiased;
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-card-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
