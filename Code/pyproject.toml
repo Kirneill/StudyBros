@@ -32,6 +32,9 @@ dependencies = [
     "ffmpeg-python>=0.2.0",
     "rich>=13.0.0",
     "fastmcp>=2.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -49,7 +52,7 @@ studybros-mcp = "mcp_server.server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["study_guide*", "mcp_server*"]
+include = ["study_guide*", "mcp_server*", "api*"]
 
 [tool.ruff]
 line-length = 100
