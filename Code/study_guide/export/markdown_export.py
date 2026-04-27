@@ -2,8 +2,8 @@
 Markdown exporter - for readable quiz and test printouts.
 """
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from study_guide.export.base import BaseExporter, ExportResult
 

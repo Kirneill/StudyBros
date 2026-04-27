@@ -17,7 +17,7 @@ help:
 	@echo ""
 
 install:
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install .
 
 dev:
 	$(PYTHON) -m pip install -e ".[dev]"

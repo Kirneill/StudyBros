@@ -42,7 +42,7 @@ class Config:
 
     # Supported file extensions
     SUPPORTED_EXTENSIONS = {
-        "document": {".pptx", ".pdf", ".txt", ".md"},
+        "document": {".pptx", ".pdf", ".txt", ".md", ".markdown", ".text"},
         "video": {".mp4", ".mov", ".webm", ".avi", ".mkv"},
         "audio": {".mp3", ".wav", ".m4a", ".aac", ".ogg"},
     }

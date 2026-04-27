@@ -3,8 +3,8 @@ File scanner - discovers supported files in a directory.
 """
 
 import hashlib
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from study_guide.config import config
 

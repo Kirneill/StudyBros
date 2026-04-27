@@ -5,11 +5,10 @@ Content extractors for different file types.
 from pathlib import Path
 
 from study_guide.ingestion.extractors.base import BaseExtractor, ExtractionResult
-from study_guide.ingestion.extractors.pptx_extractor import PPTXExtractor
 from study_guide.ingestion.extractors.pdf_extractor import PDFExtractor
+from study_guide.ingestion.extractors.pptx_extractor import PPTXExtractor
 from study_guide.ingestion.extractors.text_extractor import TextExtractor
 from study_guide.ingestion.extractors.video_extractor import VideoExtractor
-
 
 # Mapping of extensions to extractors
 _EXTRACTORS: dict[str, type[BaseExtractor]] = {
@@ -17,6 +16,8 @@ _EXTRACTORS: dict[str, type[BaseExtractor]] = {
     ".pdf": PDFExtractor,
     ".txt": TextExtractor,
     ".md": TextExtractor,
+    ".markdown": TextExtractor,
+    ".text": TextExtractor,
     ".mp4": VideoExtractor,
     ".mov": VideoExtractor,
     ".webm": VideoExtractor,

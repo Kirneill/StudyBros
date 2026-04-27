@@ -6,15 +6,15 @@ import pytest
 from pydantic import ValidationError
 
 from study_guide.generation.schemas import (
+    AudioSummary,
     Flashcard,
     FlashcardSet,
+    KeyConcept,
+    PracticeTest,
+    PracticeTestQuestion,
+    Quiz,
     QuizOption,
     QuizQuestion,
-    Quiz,
-    PracticeTestQuestion,
-    PracticeTest,
-    KeyConcept,
-    AudioSummary,
 )
 
 

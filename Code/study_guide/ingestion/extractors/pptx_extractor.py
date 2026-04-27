@@ -5,7 +5,6 @@ PowerPoint (.pptx) extractor.
 from pathlib import Path
 
 from pptx import Presentation
-from pptx.util import Inches
 
 from study_guide.ingestion.extractors.base import BaseExtractor, ExtractionResult
 

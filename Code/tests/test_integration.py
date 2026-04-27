@@ -5,13 +5,9 @@ These tests verify the complete pipeline from ingestion to export,
 without requiring actual API calls (mocked where needed).
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
 
-from study_guide.ingestion import FileScanner, TextChunker, TextExtractor
-from study_guide.database import init_db, get_session, DatabaseOperations
 from study_guide.export import get_exporter
+from study_guide.ingestion import FileScanner, TextChunker, TextExtractor
 
 
 class TestIngestionToExportWorkflow:

@@ -2,21 +2,20 @@
 Study material generator using OpenAI Structured Outputs.
 """
 
-from typing import TypeVar, Type
-from pydantic import BaseModel
+from typing import Type, TypeVar
 
 from openai import OpenAI
+from pydantic import BaseModel
 
 from study_guide.config import config
-from study_guide.generation.schemas import FlashcardSet, Quiz, PracticeTest, AudioSummary
 from study_guide.generation.prompts import (
     SYSTEM_PROMPT,
-    get_flashcard_prompt,
-    get_quiz_prompt,
-    get_practice_test_prompt,
     get_audio_summary_prompt,
+    get_flashcard_prompt,
+    get_practice_test_prompt,
+    get_quiz_prompt,
 )
-
+from study_guide.generation.schemas import AudioSummary, FlashcardSet, PracticeTest, Quiz
 
 T = TypeVar("T", bound=BaseModel)
 

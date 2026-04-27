@@ -3,12 +3,10 @@ Tests for export functionality.
 """
 
 import json
-import pytest
-from pathlib import Path
 
 from study_guide.export import (
-    JSONExporter,
     AnkiExporter,
+    JSONExporter,
     MarkdownExporter,
     get_exporter,
 )

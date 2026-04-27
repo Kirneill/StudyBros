@@ -2,18 +2,18 @@
 Generation package - AI-powered study material generation.
 """
 
+from study_guide.generation.generator import StudyMaterialGenerator
 from study_guide.generation.schemas import (
+    AudioSummary,
     Flashcard,
     FlashcardSet,
+    KeyConcept,
+    PracticeTest,
+    PracticeTestQuestion,
+    Quiz,
     QuizOption,
     QuizQuestion,
-    Quiz,
-    PracticeTestQuestion,
-    PracticeTest,
-    KeyConcept,
-    AudioSummary,
 )
-from study_guide.generation.generator import StudyMaterialGenerator
 
 __all__ = [
     "Flashcard",

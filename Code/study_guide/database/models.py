@@ -5,7 +5,7 @@ SQLAlchemy models for the Study Guide database.
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, Text, Integer, String, DateTime, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 

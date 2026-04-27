@@ -7,7 +7,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from study_guide.database.models import Source, Document, Chunk, StudySet
+from study_guide.database.models import Chunk, Document, Source, StudySet
 
 
 class DatabaseOperations:

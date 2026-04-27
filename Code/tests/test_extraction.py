@@ -2,14 +2,14 @@
 Tests for content extraction.
 """
 
+
 import pytest
-from pathlib import Path
 
 from study_guide.ingestion.extractors import (
     TextExtractor,
     get_extractor,
 )
-from study_guide.ingestion.scanner import FileScanner, ScannedFile
+from study_guide.ingestion.scanner import FileScanner
 
 
 class TestFileScanner:

@@ -2,7 +2,6 @@
 Tests for text chunking.
 """
 
-import pytest
 
 from study_guide.ingestion.chunker import TextChunker
 

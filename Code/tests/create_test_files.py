@@ -121,9 +121,9 @@ def create_sample_pdf(output_path: Path):
         # Use reportlab if available, otherwise create a minimal PDF manually
         try:
             from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
             from reportlab.lib.units import inch
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
             doc = SimpleDocTemplate(str(output_path), pagesize=letter)
             styles = getSampleStyleSheet()
@@ -328,14 +328,14 @@ def main():
     if create_sample_pptx(pptx_path):
         print(f"✓ Created: {pptx_path}")
     else:
-        print(f"✗ Failed to create PPTX")
+        print("✗ Failed to create PPTX")
 
     # Create PDF
     pdf_path = test_data_dir / "sample.pdf"
     if create_sample_pdf(pdf_path):
         print(f"✓ Created: {pdf_path}")
     else:
-        print(f"✗ Failed to create PDF")
+        print("✗ Failed to create PDF")
 
     print("\nDone!")
 

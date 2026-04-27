@@ -2,8 +2,8 @@
 Audio processing utilities using FFmpeg.
 """
 
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 import ffmpeg

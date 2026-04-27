@@ -5,7 +5,8 @@ These schemas define the exact structure expected from OpenAI's structured outpu
 """
 
 from typing import Literal
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class Flashcard(BaseModel):
@@ -58,6 +59,15 @@ class QuizQuestion(BaseModel):
     explanation: str = Field(
         description="Explanation of why the correct answer is correct"
     )
+
+    @model_validator(mode='after')
+    def validate_correct_index(self) -> 'QuizQuestion':
+        if self.correct_index >= len(self.options):
+            raise ValueError(
+                f'correct_index {self.correct_index} out of range '
+                f'for {len(self.options)} options'
+            )
+        return self
 
 
 class Quiz(BaseModel):

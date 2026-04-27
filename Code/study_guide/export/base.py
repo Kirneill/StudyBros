@@ -61,8 +61,8 @@ def get_exporter(format_type: str) -> BaseExporter | None:
     Returns:
         Exporter instance or None
     """
-    from study_guide.export.json_export import JSONExporter
     from study_guide.export.anki_export import AnkiExporter
+    from study_guide.export.json_export import JSONExporter
     from study_guide.export.markdown_export import MarkdownExporter
 
     exporters = {

@@ -2,7 +2,6 @@
 Video/Audio extractor - extracts audio and transcribes using OpenAI Whisper.
 """
 
-import os
 import tempfile
 from pathlib import Path
 
@@ -83,7 +82,6 @@ class VideoExtractor(BaseExtractor):
 
                 # Step 4: Transcribe each chunk
                 transcriptions: list[str] = []
-                total_duration = 0
 
                 for i, chunk_path in enumerate(audio_chunks):
                     transcript = self._transcribe_chunk(client, chunk_path)

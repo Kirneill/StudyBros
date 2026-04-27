@@ -2,9 +2,7 @@
 Tests for database operations.
 """
 
-import pytest
 
-from study_guide.database.operations import DatabaseOperations
 
 
 class TestSourceOperations:

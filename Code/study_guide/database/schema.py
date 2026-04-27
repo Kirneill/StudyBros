@@ -2,9 +2,11 @@
 Database schema initialization and session management.
 """
 
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from study_guide.config import config
 from study_guide.database.models import Base
@@ -35,6 +37,16 @@ def get_session_factory() -> sessionmaker:
 def get_session() -> Session:
     """Create a new database session."""
     return get_session_factory()()
+
+
+@contextmanager
+def get_session_ctx():
+    """Context manager for database sessions. Ensures session is closed."""
+    session = get_session_factory()()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def init_db() -> None:
