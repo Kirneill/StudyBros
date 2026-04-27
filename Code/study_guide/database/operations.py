@@ -3,7 +3,7 @@ Database CRUD operations.
 """
 
 import json
-from typing import Optional
+from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -224,7 +224,7 @@ class DatabaseOperations:
         """Get the parsed content of a study set."""
         study_set = self.get_study_set(set_id)
         if study_set:
-            return json.loads(study_set.content_json)
+            return cast(dict | list, json.loads(study_set.content_json))
         return None
 
     def delete_study_set(self, set_id: int) -> bool:

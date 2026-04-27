@@ -48,7 +48,7 @@ class BaseExtractor(ABC):
         filepath = Path(filepath)
         return filepath.suffix.lower() in self.supported_extensions()
 
-    def _validate_file(self, filepath: Path) -> Path:
+    def _validate_file(self, filepath: Path | str) -> Path:
         """Validate that the file exists and is readable."""
         filepath = Path(filepath)
         if not filepath.exists():

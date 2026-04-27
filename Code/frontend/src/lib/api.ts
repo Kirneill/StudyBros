@@ -5,6 +5,7 @@ import type {
   Document,
   DueCard,
   GenerateRequest,
+  GenerationProvidersResponse,
   MasteryResult,
   Phase,
   Progress,
@@ -76,6 +77,8 @@ export function getExportUrl(studySetId: number, format: string): string {
 }
 
 // Generate
+export const getGenerationProviders = () =>
+  request<GenerationProvidersResponse>("/api/generate/providers");
 export const generateFlashcards = (req: GenerateRequest) =>
   request<StudySetDetail>("/api/generate/flashcards", {
     method: "POST",

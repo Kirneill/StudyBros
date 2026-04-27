@@ -13,7 +13,7 @@ from study_guide.database.models import Base
 
 # Module-level engine and session factory
 _engine: Engine | None = None
-_SessionLocal: sessionmaker | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
 
 def get_engine() -> Engine:
@@ -26,7 +26,7 @@ def get_engine() -> Engine:
     return _engine
 
 
-def get_session_factory() -> sessionmaker:
+def get_session_factory() -> sessionmaker[Session]:
     """Get or create the session factory."""
     global _SessionLocal
     if _SessionLocal is None:

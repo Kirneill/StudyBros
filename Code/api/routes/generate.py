@@ -1,24 +1,50 @@
-"""AI generation routes (requires OPENAI_API_KEY)."""
+"""AI generation routes with provider-aware API key support."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from api.schemas import GenerateRequest, StudySetDetailResponse
+from api.schemas import GenerateRequest, GenerationProvidersResponse, StudySetDetailResponse
 from study_guide.config import config
 from study_guide.database.operations import DatabaseOperations
 from study_guide.generation.generator import StudyMaterialGenerator
 
 router = APIRouter()
 
+PROVIDER_DISPLAY_NAMES = {
+    "openai": "OpenAI",
+    "anthropic": "Claude",
+    "openrouter": "OpenRouter",
+}
 
-def _require_openai_key():
-    """Raise 503 if OpenAI API key is not configured."""
-    if not config.OPENAI_API_KEY:
+
+def _require_provider_key(provider: str, request_key: str | None) -> None:
+    """Raise 503 if neither the request nor the server provides a provider key."""
+    if request_key:
+        return
+    if not config.has_provider_api_key(provider):
+        provider_label = PROVIDER_DISPLAY_NAMES[provider]
         raise HTTPException(
             status_code=503,
-            detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable.",
+            detail=(
+                f"{provider_label} API key not configured on the server. "
+                "Provide one in the form or configure it in the server environment."
+            ),
         )
+
+
+@router.get("/providers", response_model=GenerationProvidersResponse)
+def get_generation_providers():
+    """Return generation providers and whether the server has keys for them."""
+    providers = []
+    for provider, label in PROVIDER_DISPLAY_NAMES.items():
+        providers.append({
+            "provider": provider,
+            "display_name": label,
+            "has_server_key": config.has_provider_api_key(provider),
+            "default_model": config.get_generation_model(provider),
+        })
+    return {"providers": providers}
 
 
 def _generate_and_store(
@@ -27,7 +53,8 @@ def _generate_and_store(
     gen_type: str,
 ) -> StudySetDetailResponse:
     """Shared logic: load content, generate, store, return."""
-    _require_openai_key()
+    request_key = request.api_key.strip() if request.api_key else None
+    _require_provider_key(request.provider, request_key)
 
     ops = DatabaseOperations(db)
     doc = ops.get_document(request.document_id)
@@ -47,7 +74,11 @@ def _generate_and_store(
                 detail=f"Document {request.document_id} has no extractable content",
             )
 
-    generator = StudyMaterialGenerator()
+    generator = StudyMaterialGenerator(
+        provider=request.provider,
+        api_key=request_key,
+        model=request.model,
+    )
     if chunk_texts:
         result = generator.generate_from_chunks(chunk_texts, gen_type, count=request.count)
     else:
@@ -63,7 +94,12 @@ def _generate_and_store(
             raise HTTPException(status_code=400, detail=f"Unknown generation type: {gen_type}")
 
     if not result.success:
-        raise HTTPException(status_code=502, detail=f"Generation failed: {result.error}")
+        raise HTTPException(
+            status_code=result.status_code,
+            detail=f"Generation failed: {result.error}",
+        )
+    if result.content is None:
+        raise HTTPException(status_code=502, detail="Generation failed: empty response content")
 
     # Store the result
     content_data = result.content.model_dump()

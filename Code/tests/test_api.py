@@ -19,9 +19,12 @@ from sqlalchemy.pool import StaticPool
 
 import study_guide.database.schema as db_schema
 from api.main import app
+from study_guide.config import config
 from study_guide.database.models import Base
 from study_guide.database.operations import DatabaseOperations
 from study_guide.database.schema import get_session_ctx
+from study_guide.generation.generator import GenerationResult, StudyMaterialGenerator
+from study_guide.generation.schemas import FlashcardSet
 
 # Import learning models so their tables register on Base.metadata
 from study_guide.learning.models import (  # noqa: F401
@@ -201,6 +204,90 @@ def test_upload_text_file(client):
 
 
 # ---------------------------------------------------------------------------
+# Generate
+# ---------------------------------------------------------------------------
+
+
+def test_get_generation_providers(client, monkeypatch):
+    monkeypatch.setattr(type(config), "OPENAI_API_KEY", "")
+    monkeypatch.setattr(type(config), "ANTHROPIC_API_KEY", "anthropic-test")
+    monkeypatch.setattr(type(config), "OPENROUTER_API_KEY", "")
+
+    response = client.get("/api/generate/providers")
+    assert response.status_code == 200
+    data = response.json()
+    assert "providers" in data
+    providers = {entry["provider"]: entry for entry in data["providers"]}
+    assert providers["openai"]["has_server_key"] is False
+    assert providers["anthropic"]["has_server_key"] is True
+    assert providers["openrouter"]["has_server_key"] is False
+
+
+def test_generate_flashcards_with_custom_provider_key(client, monkeypatch):
+    doc_id, _ = _seed_document()
+
+    def fake_generate_from_chunks(
+        self: StudyMaterialGenerator,
+        chunks: list[str],
+        generation_type: str,
+        count: int = 10,
+    ) -> GenerationResult:
+        assert self.provider == "anthropic"
+        assert self.api_key == "claude-test-key"
+        assert generation_type == "flashcards"
+        assert count == 5
+        return GenerationResult(
+            content=FlashcardSet.model_validate({
+                "cards": [
+                    {
+                        "question": "What is Python?",
+                        "answer": "A programming language",
+                        "tags": ["cs"],
+                        "difficulty": "easy",
+                    }
+                ]
+            }),
+            success=True,
+            tokens_used=123,
+            model="claude-test-model",
+        )
+
+    monkeypatch.setattr(StudyMaterialGenerator, "generate_from_chunks", fake_generate_from_chunks)
+
+    response = client.post(
+        "/api/generate/flashcards",
+        json={
+            "document_id": doc_id,
+            "count": 5,
+            "difficulty": "mixed",
+            "provider": "anthropic",
+            "api_key": "claude-test-key",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["item_count"] == 1
+    assert data["set_type"] == "flashcards"
+
+
+def test_generate_flashcards_requires_provider_key(client, monkeypatch):
+    doc_id, _ = _seed_document()
+    monkeypatch.setattr(type(config), "OPENAI_API_KEY", "")
+
+    response = client.post(
+        "/api/generate/flashcards",
+        json={
+            "document_id": doc_id,
+            "count": 5,
+            "difficulty": "mixed",
+            "provider": "openai",
+        },
+    )
+    assert response.status_code == 503
+    assert "API key not configured" in response.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
 # Study Sets
 # ---------------------------------------------------------------------------
 
@@ -318,6 +405,57 @@ def test_get_due_cards_with_old_reviews(client):
     assert due[0]["card_id"] == 0
 
 
+def test_get_schedule_empty(client):
+    _, study_set_id = _seed_document()
+    response = client.get(f"/api/study/{study_set_id}/schedule")
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {
+        "study_set_id": study_set_id,
+        "due_count": 0,
+        "total_reviewed": 0,
+        "cards": [],
+    }
+
+
+def test_get_schedule_with_reviews(client):
+    _, study_set_id = _seed_document()
+
+    with get_session_ctx() as session:
+        old_date = datetime.utcnow() - timedelta(days=7)
+        review = CardReview(
+            card_id=0,
+            study_set_id=study_set_id,
+            rating=3,
+            elapsed_days=0.0,
+            scheduled_days=3.0,
+            stability=2.5,
+            difficulty=5.0,
+            retrievability=1.0,
+            state="review",
+            reviewed_at=old_date,
+        )
+        session.add(review)
+        session.commit()
+
+    response = client.get(f"/api/study/{study_set_id}/schedule")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["study_set_id"] == study_set_id
+    assert data["due_count"] == 1
+    assert data["total_reviewed"] == 1
+    assert len(data["cards"]) == 1
+    assert set(data["cards"][0]) == {
+        "card_id",
+        "retrievability",
+        "stability",
+        "difficulty",
+        "state",
+        "last_review",
+        "scheduled_days",
+    }
+
+
 def test_check_mastery(client):
     response = client.post("/api/study/mastery/nonexistent")
     assert response.status_code == 200
@@ -340,10 +478,12 @@ def test_get_phase(client):
     response = client.get("/api/gamification/phase")
     assert response.status_code == 200
     data = response.json()
-    assert "phase" in data
-    assert "phase_name" in data
-    assert "total_sessions" in data
-    assert "avg_accuracy_30d" in data
+    assert set(data) == {
+        "phase",
+        "phase_name",
+        "total_sessions",
+        "avg_accuracy_30d",
+    }
 
 
 def test_get_achievements_empty(client):
@@ -356,18 +496,26 @@ def test_get_strengths_weaknesses(client):
     response = client.get("/api/gamification/strengths-weaknesses")
     assert response.status_code == 200
     data = response.json()
-    assert "strengths" in data
-    assert "weaknesses" in data
-    assert "recommendations" in data
-    assert "calibration" in data
+    assert set(data) == {
+        "strengths",
+        "weaknesses",
+        "recommendations",
+        "calibration",
+    }
 
 
 def test_get_consistency(client):
     response = client.get("/api/gamification/consistency")
     assert response.status_code == 200
     data = response.json()
-    assert "days_studied" in data
-    assert "window_days" in data
+    assert set(data) == {
+        "streak_days",
+        "consistency_pct_30d",
+        "studied_dates",
+    }
+    assert isinstance(data["streak_days"], int)
+    assert isinstance(data["consistency_pct_30d"], float)
+    assert isinstance(data["studied_dates"], list)
 
 
 def test_complete_topic(client):

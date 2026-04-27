@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from api.schemas import AchievementResponse, PhaseResponse, StrengthsWeaknessesResponse
+from api.schemas import (
+    AchievementResponse,
+    ConsistencyResponse,
+    PhaseResponse,
+    StrengthsWeaknessesResponse,
+)
 from study_guide.learning.gamification import (
     calculate_consistency_streak,
     check_topic_completion,
@@ -47,10 +52,15 @@ def get_sw(db: Session = Depends(get_db)):
     )
 
 
-@router.get("/consistency")
+@router.get("/consistency", response_model=ConsistencyResponse)
 def get_consistency(db: Session = Depends(get_db)):
     """Get consistency streak data."""
-    return calculate_consistency_streak(db)
+    data = calculate_consistency_streak(db)
+    return ConsistencyResponse(
+        streak_days=data["current_week"]["days_studied"],
+        consistency_pct_30d=data["percentage"] / 100,
+        studied_dates=data["studied_dates"],
+    )
 
 
 @router.post("/complete/{topic}")

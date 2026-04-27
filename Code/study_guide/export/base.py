@@ -3,6 +3,7 @@ Base exporter interface.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,7 +66,7 @@ def get_exporter(format_type: str) -> BaseExporter | None:
     from study_guide.export.json_export import JSONExporter
     from study_guide.export.markdown_export import MarkdownExporter
 
-    exporters = {
+    exporters: dict[str, Callable[[], BaseExporter]] = {
         "json": JSONExporter,
         "anki": AnkiExporter,
         "anki_csv": AnkiExporter,
@@ -74,7 +75,7 @@ def get_exporter(format_type: str) -> BaseExporter | None:
         "md": MarkdownExporter,
     }
 
-    exporter_class = exporters.get(format_type.lower())
-    if exporter_class:
-        return exporter_class()
+    exporter_factory = exporters.get(format_type.lower())
+    if exporter_factory:
+        return exporter_factory()
     return None

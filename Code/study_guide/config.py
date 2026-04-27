@@ -24,9 +24,29 @@ class Config:
     # Export directory
     EXPORT_DIR = Path(os.getenv("STUDY_GUIDE_EXPORT_DIR", str(DATA_DIR / "exports")))
 
+    # Generation provider settings
+    GENERATION_PROVIDER = os.getenv("STUDY_GUIDE_GENERATION_PROVIDER", "openai")
+
     # OpenAI settings
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-    GENERATION_MODEL = os.getenv("STUDY_GUIDE_GENERATION_MODEL", "gpt-4o")
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+
+    OPENAI_GENERATION_MODEL = os.getenv(
+        "STUDY_GUIDE_OPENAI_MODEL",
+        os.getenv("STUDY_GUIDE_GENERATION_MODEL", "gpt-4o"),
+    )
+    ANTHROPIC_GENERATION_MODEL = os.getenv(
+        "STUDY_GUIDE_ANTHROPIC_MODEL",
+        "claude-3-5-sonnet-latest",
+    )
+    OPENROUTER_GENERATION_MODEL = os.getenv(
+        "STUDY_GUIDE_OPENROUTER_MODEL",
+        "openai/gpt-4o-mini",
+    )
+
+    # Backward-compatible alias for legacy call sites
+    GENERATION_MODEL = OPENAI_GENERATION_MODEL
     TRANSCRIPTION_MODEL = os.getenv("STUDY_GUIDE_TRANSCRIPTION_MODEL", "whisper-1")
 
     # Generation limits (cost guardrails)
@@ -58,9 +78,43 @@ class Config:
     def validate(cls) -> list[str]:
         """Validate configuration and return list of errors."""
         errors = []
-        if not cls.OPENAI_API_KEY:
+        provider = cls.GENERATION_PROVIDER.lower()
+        if provider == "anthropic" and not cls.ANTHROPIC_API_KEY:
+            errors.append("ANTHROPIC_API_KEY is not set")
+        elif provider == "openrouter" and not cls.OPENROUTER_API_KEY:
+            errors.append("OPENROUTER_API_KEY is not set")
+        elif provider == "openai" and not cls.OPENAI_API_KEY:
             errors.append("OPENAI_API_KEY is not set")
+        elif provider not in {"openai", "anthropic", "openrouter"}:
+            errors.append(
+                "STUDY_GUIDE_GENERATION_PROVIDER must be one of: openai, anthropic, openrouter"
+            )
         return errors
+
+    @classmethod
+    def get_provider_api_key(cls, provider: str) -> str:
+        """Return the configured API key for a generation provider."""
+        normalized = provider.lower()
+        if normalized == "anthropic":
+            return cls.ANTHROPIC_API_KEY
+        if normalized == "openrouter":
+            return cls.OPENROUTER_API_KEY
+        return cls.OPENAI_API_KEY
+
+    @classmethod
+    def has_provider_api_key(cls, provider: str) -> bool:
+        """Whether a provider has a server-configured API key."""
+        return bool(cls.get_provider_api_key(provider).strip())
+
+    @classmethod
+    def get_generation_model(cls, provider: str) -> str:
+        """Return the default generation model for a provider."""
+        normalized = provider.lower()
+        if normalized == "anthropic":
+            return cls.ANTHROPIC_GENERATION_MODEL
+        if normalized == "openrouter":
+            return cls.OPENROUTER_GENERATION_MODEL
+        return cls.OPENAI_GENERATION_MODEL
 
     @classmethod
     def get_all_supported_extensions(cls) -> set[str]:

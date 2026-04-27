@@ -1,15 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button, Spinner, Toast } from "@/components/ui";
+import { Button, Card, Modal, Spinner, Toast } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
-import type { GenerateRequest } from "@/lib/types";
+import type {
+  GenerateRequest,
+  GenerationProvider,
+  GenerationProviderInfo,
+} from "@/lib/types";
 import { STUDY_SET_TYPES } from "@/lib/constants";
 
 type GenType = "flashcards" | "quiz" | "practice_test" | "audio_summary";
+type ProviderKeyState = Partial<Record<GenerationProvider, string>>;
 
 const GEN_FUNCTIONS: Record<GenType, (req: GenerateRequest) => ReturnType<typeof api.generateFlashcards>> = {
   flashcards: api.generateFlashcards,
@@ -18,24 +23,93 @@ const GEN_FUNCTIONS: Record<GenType, (req: GenerateRequest) => ReturnType<typeof
   audio_summary: api.generateSummary,
 };
 
+const PROVIDER_STORAGE_PREFIX = "studybros_api_key:";
+const PROVIDER_LABELS: Record<GenerationProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Claude",
+  openrouter: "OpenRouter",
+};
+
+function getStoredProviderKeys(): ProviderKeyState {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const storedKeys: ProviderKeyState = {};
+  (["openai", "anthropic", "openrouter"] as GenerationProvider[]).forEach((candidate) => {
+    const key = window.localStorage.getItem(`${PROVIDER_STORAGE_PREFIX}${candidate}`);
+    if (key) {
+      storedKeys[candidate] = key;
+    }
+  });
+  return storedKeys;
+}
+
 export default function GeneratePage() {
   const params = useParams();
   const router = useRouter();
   const docId = Number(params.id);
 
   const { data: doc, loading } = useApi(useCallback(() => api.getDocument(docId), [docId]));
+  const { data: providerData, loading: loadingProviders } = useApi(
+    useCallback(() => api.getGenerationProviders(), []),
+  );
 
+  const [provider, setProvider] = useState<GenerationProvider>("openai");
   const [genType, setGenType] = useState<GenType>("flashcards");
   const [count, setCount] = useState(10);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "mixed">("mixed");
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [providerKeys, setProviderKeys] = useState<ProviderKeyState>(getStoredProviderKeys);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [pendingKey, setPendingKey] = useState("");
 
-  const handleGenerate = useCallback(async () => {
+  const availableProviders = useMemo(
+    () => providerData?.providers ?? [],
+    [providerData],
+  );
+  const effectiveProvider = useMemo<GenerationProvider>(() => {
+    if (availableProviders.some((entry) => entry.provider === provider)) {
+      return provider;
+    }
+    const serverBacked = availableProviders.find((entry) => entry.has_server_key);
+    return serverBacked?.provider ?? availableProviders[0]?.provider ?? provider;
+  }, [availableProviders, provider]);
+
+  const selectedProvider = useMemo<GenerationProviderInfo | undefined>(
+    () => availableProviders.find((entry) => entry.provider === effectiveProvider),
+    [availableProviders, effectiveProvider],
+  );
+
+  const activeClientKey = providerKeys[effectiveProvider]?.trim();
+
+  const persistProviderKey = useCallback((target: GenerationProvider, key: string) => {
+    const normalized = key.trim();
+    setProviderKeys((current) => {
+      const next = { ...current };
+      if (normalized) {
+        next[target] = normalized;
+        window.localStorage.setItem(`${PROVIDER_STORAGE_PREFIX}${target}`, normalized);
+      } else {
+        delete next[target];
+        window.localStorage.removeItem(`${PROVIDER_STORAGE_PREFIX}${target}`);
+      }
+      return next;
+    });
+  }, []);
+
+  const runGenerate = useCallback(async (apiKeyOverride?: string) => {
     setGenerating(true);
     setToast(null);
     try {
-      const result = await GEN_FUNCTIONS[genType]({ document_id: docId, count, difficulty });
+      const result = await GEN_FUNCTIONS[genType]({
+        document_id: docId,
+        count,
+        difficulty,
+        provider: effectiveProvider,
+        api_key: apiKeyOverride ?? activeClientKey ?? undefined,
+      });
       setToast({ message: `Generated ${result.item_count} items!`, type: "success" });
       setTimeout(() => router.push(`/study-sets/${result.id}`), 1500);
     } catch (err) {
@@ -44,9 +118,29 @@ export default function GeneratePage() {
     } finally {
       setGenerating(false);
     }
-  }, [genType, docId, count, difficulty, router]);
+  }, [activeClientKey, count, difficulty, docId, effectiveProvider, genType, router]);
 
-  if (loading) {
+  const handleGenerate = useCallback(async () => {
+    if (!selectedProvider?.has_server_key && !activeClientKey) {
+      setPendingKey("");
+      setKeyModalOpen(true);
+      return;
+    }
+    await runGenerate();
+  }, [activeClientKey, runGenerate, selectedProvider]);
+
+  const handleSaveKeyAndGenerate = useCallback(async () => {
+    const normalized = pendingKey.trim();
+    if (!normalized) {
+      setToast({ message: `Enter a ${PROVIDER_LABELS[effectiveProvider]} API key first.`, type: "error" });
+      return;
+    }
+    persistProviderKey(effectiveProvider, normalized);
+    setKeyModalOpen(false);
+    await runGenerate(normalized);
+  }, [effectiveProvider, pendingKey, persistProviderKey, runGenerate]);
+
+  if (loading || loadingProviders) {
     return <div className="flex items-center justify-center py-20"><Spinner size="lg" /></div>;
   }
 
@@ -56,6 +150,46 @@ export default function GeneratePage() {
       <p className="text-text-secondary mb-8">from {doc?.title || "Untitled"}</p>
 
       <div className="max-w-xl space-y-6">
+        {/* Provider selection */}
+        <div>
+          <label className="text-sm font-medium mb-3 block">AI Provider</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {availableProviders.map((entry) => (
+              <button
+                key={entry.provider}
+                onClick={() => setProvider(entry.provider)}
+                className={`p-4 rounded-xl border text-left transition-colors ${
+                  effectiveProvider === entry.provider
+                    ? "border-accent bg-accent/5 text-accent"
+                    : "border-border bg-bg-card hover:bg-bg-card-hover text-text-secondary"
+                }`}
+              >
+                <span className="text-sm font-semibold block mb-1">{entry.display_name}</span>
+                <span className="text-xs text-text-muted block">{entry.default_model}</span>
+              </button>
+            ))}
+          </div>
+          {selectedProvider && (
+            <Card className="mt-3 p-4">
+              <p className="text-sm text-text-secondary">
+                {selectedProvider.has_server_key
+                  ? `Using the server-configured ${selectedProvider.display_name} key.`
+                  : activeClientKey
+                    ? `Using a ${selectedProvider.display_name} key saved in this browser.`
+                    : `No ${selectedProvider.display_name} key is configured on the server. You will be prompted to enter one.`}
+              </p>
+              {!selectedProvider.has_server_key && activeClientKey && (
+                <button
+                  onClick={() => persistProviderKey(effectiveProvider, "")}
+                  className="mt-2 text-xs text-accent hover:text-accent-hover"
+                >
+                  Clear saved key
+                </button>
+              )}
+            </Card>
+          )}
+        </div>
+
         {/* Type selection */}
         <div>
           <label className="text-sm font-medium mb-3 block">Material Type</label>
@@ -122,9 +256,45 @@ export default function GeneratePage() {
         </Button>
 
         <p className="text-xs text-text-muted text-center">
-          Requires OpenAI API key configured on the server.
+          If the server does not have a key for the selected provider, you can enter your own and
+          it will be stored locally in this browser.
         </p>
       </div>
+
+      <Modal
+        open={keyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
+        title={`Add ${PROVIDER_LABELS[effectiveProvider]} API Key`}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            The server does not have a {PROVIDER_LABELS[effectiveProvider]} key configured. Enter
+            your key to continue generation. It will be stored only in this browser on this
+            device.
+          </p>
+          <div>
+            <label htmlFor="provider-api-key" className="text-sm font-medium mb-2 block">
+              {PROVIDER_LABELS[effectiveProvider]} API Key
+            </label>
+            <input
+              id="provider-api-key"
+              type="password"
+              value={pendingKey}
+              onChange={(e) => setPendingKey(e.target.value)}
+              className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary"
+              placeholder={`Paste your ${PROVIDER_LABELS[effectiveProvider]} API key`}
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setKeyModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveKeyAndGenerate} loading={generating}>
+              Save & Generate
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
     </div>

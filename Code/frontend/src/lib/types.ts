@@ -63,10 +63,26 @@ export interface Progress {
 }
 
 // Generation
+export type GenerationProvider = "openai" | "anthropic" | "openrouter";
+
 export interface GenerateRequest {
   document_id: number;
   count: number;
   difficulty: "easy" | "medium" | "hard" | "mixed";
+  provider: GenerationProvider;
+  api_key?: string;
+  model?: string;
+}
+
+export interface GenerationProviderInfo {
+  provider: GenerationProvider;
+  display_name: string;
+  has_server_key: boolean;
+  default_model: string;
+}
+
+export interface GenerationProvidersResponse {
+  providers: GenerationProviderInfo[];
 }
 
 // Gamification

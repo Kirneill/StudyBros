@@ -87,11 +87,27 @@ class ProgressResponse(BaseModel):
 # Generation
 # ---------------------------------------------------------------------------
 
+GenerationProvider = Literal["openai", "anthropic", "openrouter"]
+
 
 class GenerateRequest(BaseModel):
     document_id: int
     count: int = Field(default=10, ge=1, le=50)
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
+    provider: GenerationProvider = "openai"
+    api_key: str | None = Field(default=None, min_length=1)
+    model: str | None = None
+
+
+class GenerationProviderResponse(BaseModel):
+    provider: GenerationProvider
+    display_name: str
+    has_server_key: bool
+    default_model: str
+
+
+class GenerationProvidersResponse(BaseModel):
+    providers: list[GenerationProviderResponse]
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +136,12 @@ class StrengthsWeaknessesResponse(BaseModel):
     weaknesses: list[dict]
     recommendations: list[dict]
     calibration: dict
+
+
+class ConsistencyResponse(BaseModel):
+    streak_days: int
+    consistency_pct_30d: float
+    studied_dates: list[str]
 
 
 class ScheduleCardResponse(BaseModel):

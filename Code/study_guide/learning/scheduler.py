@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta
+from typing import TypedDict
 
 from sqlalchemy import and_
 from sqlalchemy import func as sa_func
@@ -18,8 +19,15 @@ from sqlalchemy.orm import Session
 
 from study_guide.learning.models import CardReview, UserProgress
 
+
+class FSRSDefaults(TypedDict):
+    w: list[float]
+    desired_retention: float
+    maximum_interval: int
+
+
 # FSRS v5 default weights from the paper
-FSRS_DEFAULTS: dict = {
+FSRS_DEFAULTS: FSRSDefaults = {
     "w": [
         0.4072, 1.1829, 3.1262, 15.4722,  # w0-w3: initial stability
         7.2102, 0.5316,                      # w4-w5: initial difficulty
@@ -87,7 +95,7 @@ def calculate_next_stability(
     """
     if rating == 1:
         # Lapse / failure
-        new_s = (
+        new_s: float = (
             w[11]
             * d ** (-w[12])
             * ((s + 1) ** w[13] - 1)
@@ -102,7 +110,7 @@ def calculate_next_stability(
             * (math.exp(w[10] * (1 - r)) - 1)
             + 1
         )
-    return max(new_s, 0.01)
+    return new_s if new_s > 0.01 else 0.01
 
 
 def calculate_next_interval(

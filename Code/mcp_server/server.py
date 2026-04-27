@@ -70,7 +70,7 @@ mcp = FastMCP(
 # Helpers
 # ---------------------------------------------------------------------------
 
-_SCHEMA_MAP: dict[str, type] = {
+_SCHEMA_MAP: dict[str, type[FlashcardSet | Quiz | PracticeTest | AudioSummary]] = {
     "flashcards": FlashcardSet,
     "quiz": Quiz,
     "practice_test": PracticeTest,
@@ -478,7 +478,8 @@ def get_status() -> str:
             return _json({
                 "version": "0.1.0",
                 "db_path": str(config.DB_PATH),
-                "generation_model": config.GENERATION_MODEL,
+                "generation_provider": config.GENERATION_PROVIDER,
+                "generation_model": config.get_generation_model(config.GENERATION_PROVIDER),
                 "stats": stats,
             })
     except Exception as exc:

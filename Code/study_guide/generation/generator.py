@@ -1,10 +1,18 @@
 """
-Study material generator using OpenAI Structured Outputs.
+Study material generator using provider-specific LLM APIs.
 """
 
-from typing import Type, TypeVar
+import json
+from typing import Literal, Type, TypeVar
 
+from anthropic import Anthropic
+from anthropic import APIStatusError as AnthropicAPIStatusError
+from anthropic import AuthenticationError as AnthropicAuthenticationError
+from openai import APIStatusError as OpenAIAPIStatusError
+from openai import AuthenticationError as OpenAIAuthenticationError
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
+from openai.types.shared_params import ResponseFormatJSONObject
 from pydantic import BaseModel
 
 from study_guide.config import config
@@ -17,6 +25,7 @@ from study_guide.generation.prompts import (
 )
 from study_guide.generation.schemas import AudioSummary, FlashcardSet, PracticeTest, Quiz
 
+GenerationProvider = Literal["openai", "anthropic", "openrouter"]
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -30,58 +39,111 @@ class GenerationResult:
         error: str | None = None,
         tokens_used: int = 0,
         model: str | None = None,
+        status_code: int = 200,
     ):
         self.content = content
         self.success = success
         self.error = error
         self.tokens_used = tokens_used
         self.model = model
+        self.status_code = status_code
 
 
 class StudyMaterialGenerator:
-    """Generates study materials using OpenAI's Structured Outputs."""
+    """Generates study materials using supported LLM providers."""
 
-    def __init__(self):
-        self.client: OpenAI | None = None
-        self.model = config.GENERATION_MODEL
+    def __init__(
+        self,
+        provider: GenerationProvider | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+    ):
+        default_provider = config.GENERATION_PROVIDER.lower()
+        if default_provider not in {"openai", "anthropic", "openrouter"}:
+            default_provider = "openai"
 
-    def _get_client(self) -> OpenAI:
-        """Get or create OpenAI client."""
-        if self.client is None:
-            if not config.OPENAI_API_KEY:
-                raise ValueError("OPENAI_API_KEY is not set")
-            self.client = OpenAI(api_key=config.OPENAI_API_KEY)
-        return self.client
+        self.provider: GenerationProvider = provider or default_provider  # type: ignore[assignment]
+        self.api_key = api_key
+        self.model = model or config.get_generation_model(self.provider)
+        self._openai_client: OpenAI | None = None
+        self._anthropic_client: Anthropic | None = None
 
-    def _generate_structured(
+    def _resolve_api_key(self) -> str:
+        """Resolve API key from request override or server config."""
+        api_key = self.api_key or config.get_provider_api_key(self.provider)
+        if not api_key:
+            provider_label = self.provider.capitalize()
+            raise ValueError(f"{provider_label} API key is not set")
+        return api_key
+
+    def _get_openai_client(self, *, base_url: str | None = None) -> OpenAI:
+        """Get or create an OpenAI-compatible client."""
+        if self._openai_client is None:
+            self._openai_client = OpenAI(api_key=self._resolve_api_key(), base_url=base_url)
+        return self._openai_client
+
+    def _get_anthropic_client(self) -> Anthropic:
+        """Get or create an Anthropic client."""
+        if self._anthropic_client is None:
+            self._anthropic_client = Anthropic(api_key=self._resolve_api_key())
+        return self._anthropic_client
+
+    def _build_json_prompt(self, prompt: str, schema: Type[T]) -> str:
+        """Append strict JSON output requirements to a generation prompt."""
+        schema_json = json.dumps(schema.model_json_schema(), indent=2)
+        return (
+            f"{prompt}\n\n"
+            "Return only valid JSON. Do not add commentary, markdown, or code fences.\n"
+            f"The JSON must validate against this schema:\n{schema_json}\n"
+        )
+
+    def _extract_json_text(self, raw_text: str) -> str:
+        """Strip common markdown fences from provider output."""
+        cleaned = raw_text.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+        return cleaned
+
+    def _parse_structured_text(self, raw_text: str, schema: Type[T]) -> T:
+        """Parse provider text output into a validated schema instance."""
+        payload = json.loads(self._extract_json_text(raw_text))
+        return schema.model_validate(payload)
+
+    def _generate_with_openai_compatible(
         self,
         prompt: str,
         schema: Type[T],
+        *,
+        base_url: str | None = None,
     ) -> GenerationResult:
-        """
-        Generate structured output using OpenAI's response format.
-
-        Args:
-            prompt: The user prompt
-            schema: Pydantic schema for the response
-
-        Returns:
-            GenerationResult with parsed content
-        """
+        """Generate structured JSON using an OpenAI-compatible API."""
         try:
-            client = self._get_client()
-
-            response = client.beta.chat.completions.parse(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                response_format=schema,
-                max_tokens=config.MAX_TOKENS_PER_RESPONSE,
-            )
-
-            parsed = response.choices[0].message.parsed
+            client = self._get_openai_client(base_url=base_url)
+            messages: list[ChatCompletionMessageParam] = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": self._build_json_prompt(prompt, schema)},
+            ]
+            if self.provider == "openai":
+                response_format: ResponseFormatJSONObject = {"type": "json_object"}
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=config.MAX_TOKENS_PER_RESPONSE,
+                    response_format=response_format,
+                )
+            else:
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=config.MAX_TOKENS_PER_RESPONSE,
+                )
+            raw_content = response.choices[0].message.content or ""
+            parsed = self._parse_structured_text(raw_content, schema)
             tokens_used = response.usage.total_tokens if response.usage else 0
 
             return GenerationResult(
@@ -90,29 +152,119 @@ class StudyMaterialGenerator:
                 tokens_used=tokens_used,
                 model=self.model,
             )
-
-        except Exception as e:
+        except OpenAIAuthenticationError as exc:
             return GenerationResult(
                 content=None,
                 success=False,
-                error=str(e),
+                error=str(exc),
+                model=self.model,
+                status_code=401,
             )
+        except OpenAIAPIStatusError as exc:
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=str(exc),
+                model=self.model,
+                status_code=exc.status_code or 502,
+            )
+        except Exception as exc:
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=str(exc),
+                model=self.model,
+                status_code=502,
+            )
+
+    def _generate_with_anthropic(self, prompt: str, schema: Type[T]) -> GenerationResult:
+        """Generate structured JSON using Anthropic."""
+        try:
+            client = self._get_anthropic_client()
+            response = client.messages.create(
+                model=self.model,
+                max_tokens=config.MAX_TOKENS_PER_RESPONSE,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self._build_json_prompt(prompt, schema),
+                    }
+                ],
+            )
+            text_blocks: list[str] = []
+            for block in response.content:
+                if getattr(block, "type", "") != "text":
+                    continue
+                text = getattr(block, "text", None)
+                if isinstance(text, str):
+                    text_blocks.append(text)
+            raw_content = "".join(text_blocks)
+            parsed = self._parse_structured_text(raw_content, schema)
+            tokens_used = response.usage.input_tokens + response.usage.output_tokens
+
+            return GenerationResult(
+                content=parsed,
+                success=True,
+                tokens_used=tokens_used,
+                model=self.model,
+            )
+        except AnthropicAuthenticationError as exc:
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=str(exc),
+                model=self.model,
+                status_code=401,
+            )
+        except AnthropicAPIStatusError as exc:
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=str(exc),
+                model=self.model,
+                status_code=exc.status_code or 502,
+            )
+        except Exception as exc:
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=str(exc),
+                model=self.model,
+                status_code=502,
+            )
+
+    def _generate_structured(
+        self,
+        prompt: str,
+        schema: Type[T],
+    ) -> GenerationResult:
+        """
+        Generate structured output using the configured provider.
+
+        Args:
+            prompt: The user prompt
+            schema: Pydantic schema for the response
+
+        Returns:
+            GenerationResult with parsed content
+        """
+        if self.provider == "anthropic":
+            return self._generate_with_anthropic(prompt, schema)
+        if self.provider == "openrouter":
+            return self._generate_with_openai_compatible(
+                prompt,
+                schema,
+                base_url="https://openrouter.ai/api/v1",
+            )
+        return self._generate_with_openai_compatible(prompt, schema)
 
     def generate_flashcards(
         self,
         content: str,
         count: int = 10,
     ) -> GenerationResult:
-        """
-        Generate flashcards from content.
-
-        Args:
-            content: Text content to generate flashcards from
-            count: Number of flashcards to generate
-
-        Returns:
-            GenerationResult with FlashcardSet
-        """
+        """Generate flashcards from content."""
         prompt = get_flashcard_prompt(content, count)
         return self._generate_structured(prompt, FlashcardSet)
 
@@ -121,16 +273,7 @@ class StudyMaterialGenerator:
         content: str,
         count: int = 10,
     ) -> GenerationResult:
-        """
-        Generate a multiple choice quiz from content.
-
-        Args:
-            content: Text content to generate quiz from
-            count: Number of questions to generate
-
-        Returns:
-            GenerationResult with Quiz
-        """
+        """Generate a multiple choice quiz from content."""
         prompt = get_quiz_prompt(content, count)
         return self._generate_structured(prompt, Quiz)
 
@@ -139,16 +282,7 @@ class StudyMaterialGenerator:
         content: str,
         count: int = 15,
     ) -> GenerationResult:
-        """
-        Generate a practice test with mixed question types.
-
-        Args:
-            content: Text content to generate test from
-            count: Number of questions to generate
-
-        Returns:
-            GenerationResult with PracticeTest
-        """
+        """Generate a practice test with mixed question types."""
         prompt = get_practice_test_prompt(content, count)
         return self._generate_structured(prompt, PracticeTest)
 
@@ -158,17 +292,7 @@ class StudyMaterialGenerator:
         concept_count: int = 5,
         point_count: int = 7,
     ) -> GenerationResult:
-        """
-        Generate an audio-friendly summary suitable for TTS.
-
-        Args:
-            content: Text content to summarize
-            concept_count: Number of key concepts to extract
-            point_count: Number of main points to include
-
-        Returns:
-            GenerationResult with AudioSummary
-        """
+        """Generate an audio-friendly summary suitable for TTS."""
         prompt = get_audio_summary_prompt(content, concept_count, point_count)
         return self._generate_structured(prompt, AudioSummary)
 
@@ -182,36 +306,24 @@ class StudyMaterialGenerator:
         Generate study materials from multiple chunks.
 
         Respects the MAX_CHUNKS_PER_GENERATION limit.
-
-        Args:
-            chunks: List of text chunks
-            generation_type: "flashcards", "quiz", or "practice_test"
-            count: Number of items to generate
-
-        Returns:
-            GenerationResult
         """
-        # Limit chunks to respect cost guardrails
         max_chunks = config.MAX_CHUNKS_PER_GENERATION
         if len(chunks) > max_chunks:
             chunks = chunks[:max_chunks]
 
-        # Combine chunks
         combined_content = "\n\n---\n\n".join(chunks)
 
-        # Generate based on type
         if generation_type == "flashcards":
             return self.generate_flashcards(combined_content, count)
-        elif generation_type == "quiz":
+        if generation_type == "quiz":
             return self.generate_quiz(combined_content, count)
-        elif generation_type == "practice_test":
+        if generation_type == "practice_test":
             return self.generate_practice_test(combined_content, count)
-        elif generation_type == "audio_summary":
-            # For audio summary, count controls number of main points
+        if generation_type == "audio_summary":
             return self.generate_audio_summary(combined_content, concept_count=5, point_count=count)
-        else:
-            return GenerationResult(
-                content=None,
-                success=False,
-                error=f"Unknown generation type: {generation_type}",
-            )
+        return GenerationResult(
+            content=None,
+            success=False,
+            error=f"Unknown generation type: {generation_type}",
+            status_code=400,
+        )

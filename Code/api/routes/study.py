@@ -1,6 +1,7 @@
 """FSRS study routes: reviews, due cards, mastery, progress."""
 
 from datetime import datetime
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_
@@ -26,6 +27,16 @@ from study_guide.learning.scheduler import (
 )
 
 router = APIRouter()
+
+
+class ScheduleCardData(TypedDict):
+    card_id: int
+    retrievability: float
+    stability: float
+    difficulty: float
+    state: str
+    last_review: str
+    scheduled_days: float
 
 
 @router.post("/{study_set_id}/review", response_model=ReviewResponse)
@@ -138,7 +149,7 @@ def get_schedule(study_set_id: int, db: Session = Depends(get_db)):
         .all()
     )
 
-    all_cards = []
+    all_cards: list[ScheduleCardData] = []
     for rev in latest_reviews:
         elapsed = max((now - rev.reviewed_at).total_seconds() / 86400.0, 0.0)
         r = calculate_retrievability(elapsed, rev.stability)

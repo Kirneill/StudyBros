@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from typing import TypedDict
 
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
@@ -45,6 +46,28 @@ BLOOM_LABELS = {
     5: "evaluate",
     6: "create",
 }
+
+
+class TopicInsight(TypedDict):
+    topic: str
+    accuracy: float
+    bloom_level: int
+    message: str
+
+
+class Recommendation(TypedDict):
+    action: str
+    reason: str
+    topic: str
+
+
+class CompletionPayload(TypedDict):
+    completed: bool
+    topic: str
+    stats: dict[str, object]
+    strengths: list[str]
+    weaknesses: list[str]
+    achievement_earned: dict[str, object] | None
 
 # Achievement definitions: (type, title, description)
 ACHIEVEMENT_DEFS = {
@@ -231,8 +254,8 @@ def check_topic_completion(session: Session, topic_tag: str) -> dict:
             ) / len(latest_reviews_for_avg)
 
     # Strengths and weaknesses based on mastery criteria
-    strengths = []
-    weaknesses = []
+    strengths: list[str] = []
+    weaknesses: list[str] = []
 
     if details.get("bloom_ok"):
         strengths.append(
@@ -290,8 +313,8 @@ def get_strengths_weaknesses(session: Session) -> dict:
     """Analyze user strengths and weaknesses across all topics."""
     all_progress = session.query(UserProgress).all()
 
-    strengths = []
-    weaknesses = []
+    strengths: list[TopicInsight] = []
+    weaknesses: list[TopicInsight] = []
 
     for prog in all_progress:
         # Get accuracy from recent sessions for this topic
@@ -322,10 +345,11 @@ def get_strengths_weaknesses(session: Session) -> dict:
         accuracy = total_correct / total_items if total_items > 0 else 0.0
 
         bloom = prog.bloom_highest_level
-        entry = {
+        entry: TopicInsight = {
             "topic": prog.topic_tag,
             "accuracy": round(accuracy * 100, 1),
             "bloom_level": bloom,
+            "message": "",
         }
 
         if accuracy >= 0.80 and bloom >= 3:
@@ -342,7 +366,7 @@ def get_strengths_weaknesses(session: Session) -> dict:
             weaknesses.append(entry)
 
     # Recommendations
-    recommendations = []
+    recommendations: list[Recommendation] = []
     for w in weaknesses[:3]:
         if w["bloom_level"] < 2:
             recommendations.append({
@@ -366,14 +390,16 @@ def get_strengths_weaknesses(session: Session) -> dict:
 
     avg_confidence = 0.0
     avg_review_accuracy = 0.0
-    overconfident = []
-    underconfident = []
+    overconfident: list[str] = []
+    underconfident: list[str] = []
 
     if reviews_with_confidence:
         # Confidence is 1-5 scale, normalize to 0-1
-        avg_confidence = sum(
+        confidence_ratings = [
             r.confidence_rating for r in reviews_with_confidence
-        ) / len(reviews_with_confidence) / 5.0
+            if r.confidence_rating is not None
+        ]
+        avg_confidence = sum(confidence_ratings) / len(reviews_with_confidence) / 5.0
         avg_review_accuracy = sum(
             1.0 for r in reviews_with_confidence if r.rating >= 2
         ) / len(reviews_with_confidence)
@@ -396,9 +422,11 @@ def get_strengths_weaknesses(session: Session) -> dict:
             ]
             if not topic_reviews:
                 continue
-            conf = sum(
+            topic_confidence_ratings = [
                 r.confidence_rating for r in topic_reviews
-            ) / len(topic_reviews) / 5.0
+                if r.confidence_rating is not None
+            ]
+            conf = sum(topic_confidence_ratings) / len(topic_reviews) / 5.0
             acc = sum(
                 1.0 for r in topic_reviews if r.rating >= 2
             ) / len(topic_reviews)
@@ -586,6 +614,13 @@ def calculate_consistency_streak(session: Session, days: int = 30) -> dict:
 
     percentage = (distinct_days / days * 100) if days > 0 else 0.0
 
+    studied_dates_raw = (
+        session.query(sa_func.distinct(sa_func.date(StudySession.started_at)))
+        .filter(StudySession.started_at >= cutoff)
+        .all()
+    )
+    studied_dates = [str(d[0]) for d in studied_dates_raw]
+
     return {
         "days_studied": distinct_days,
         "window_days": days,
@@ -595,6 +630,7 @@ def calculate_consistency_streak(session: Session, days: int = 30) -> dict:
             "total": 7,
         },
         "message": f"{week_days} of last 7 days",
+        "studied_dates": studied_dates,
     }
 
 

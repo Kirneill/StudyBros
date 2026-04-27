@@ -10,7 +10,6 @@ def create_sample_pptx(output_path: Path):
     """Create a sample PowerPoint file for testing."""
     try:
         from pptx import Presentation
-        from pptx.util import Inches, Pt
 
         prs = Presentation()
 
@@ -122,7 +121,6 @@ def create_sample_pdf(output_path: Path):
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-            from reportlab.lib.units import inch
             from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
             doc = SimpleDocTemplate(str(output_path), pagesize=letter)
@@ -295,12 +293,12 @@ endobj
 endobj
 xref
 0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000266 00000 n 
-0000000518 00000 n 
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000115 00000 n
+0000000266 00000 n
+0000000518 00000 n
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
