@@ -7,21 +7,21 @@ export function CalibrationChart({ calibration }: CalibrationChartProps) {
   const avgAccuracy = Number(calibration.avg_accuracy ?? 0);
   const score = Number(calibration.calibration_score ?? 0);
 
-  const isOverconfident = avgConfidence / 5 > avgAccuracy;
-  const isUnderconfident = avgConfidence / 5 < avgAccuracy - 0.1;
+  const isOverconfident = avgConfidence > avgAccuracy + 10;
+  const isUnderconfident = avgConfidence < avgAccuracy - 10;
 
   return (
     <div className="space-y-4">
       <div className="flex gap-4">
         <div className="flex-1 p-4 rounded-lg bg-bg-card border border-border text-center">
           <span className="text-2xl font-bold font-mono text-info">
-            {avgConfidence.toFixed(1)}
+            {Math.round(avgConfidence)}%
           </span>
-          <p className="text-xs text-text-muted mt-1">Avg Confidence (1-5)</p>
+          <p className="text-xs text-text-muted mt-1">Avg Confidence</p>
         </div>
         <div className="flex-1 p-4 rounded-lg bg-bg-card border border-border text-center">
           <span className="text-2xl font-bold font-mono text-accent">
-            {Math.round(avgAccuracy * 100)}%
+            {Math.round(avgAccuracy)}%
           </span>
           <p className="text-xs text-text-muted mt-1">Avg Accuracy</p>
         </div>

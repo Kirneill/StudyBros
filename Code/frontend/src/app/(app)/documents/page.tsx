@@ -127,6 +127,13 @@ export default function DocumentsPage() {
           >
             Delete Selected
           </Button>
+          {selectedIds.length > 0 && (
+            <Link href={`/documents/${selectedIds[0]}/generate`}>
+              <span className="inline-flex items-center px-4 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10 transition-colors">
+                Generate Study Materials
+              </span>
+            </Link>
+          )}
           <Link href="/upload">
             <span className="inline-flex items-center px-4 py-2 rounded-lg bg-accent text-bg-primary text-sm font-medium hover:bg-accent-hover transition-colors">
               Upload New
