@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "◉" },
@@ -24,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="text-accent">Study</span>Bros
           </Link>
         </div>
-        <nav className="flex-1 px-3 space-y-1">
+        <nav aria-label="Main navigation" className="flex-1 px-3 space-y-1">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -49,7 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-secondary border-t border-border flex justify-around py-2">
+      <nav role="navigation" aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-secondary border-t border-border flex justify-around py-2">
         {NAV_ITEMS.slice(0, 5).map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
@@ -69,7 +70,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto pb-20 md:pb-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</div>
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        >
+          {children}
+        </motion.div>
       </main>
     </div>
   );
