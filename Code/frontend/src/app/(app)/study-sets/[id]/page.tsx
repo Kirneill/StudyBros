@@ -8,6 +8,7 @@ import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { STUDY_SET_TYPES } from "@/lib/constants";
+import Link from "next/link";
 
 export default function StudySetDetailPage() {
   const params = useParams();
@@ -66,6 +67,33 @@ export default function StudySetDetailPage() {
           </a>
           <Button variant="ghost" size="sm" onClick={() => setShowDelete(true)}>Delete</Button>
         </div>
+      </div>
+
+      {/* Study actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <Link href={`/study-sets/${id}/study`}>
+          <Card hover className="text-center py-5 border-accent/20 hover:border-accent/40">
+            <span className="text-2xl block mb-2">📖</span>
+            <span className="font-medium text-sm">Study Flashcards</span>
+            {schedule && schedule.due_count > 0 && (
+              <p className="text-xs text-warning mt-1">{schedule.due_count} cards due</p>
+            )}
+          </Card>
+        </Link>
+        <Link href={`/study-sets/${id}/quiz`}>
+          <Card hover className="text-center py-5">
+            <span className="text-2xl block mb-2">❓</span>
+            <span className="font-medium text-sm">Take Quiz</span>
+            <p className="text-xs text-text-muted mt-1">One at a time</p>
+          </Card>
+        </Link>
+        <Link href={`/study-sets/${id}/test`}>
+          <Card hover className="text-center py-5">
+            <span className="text-2xl block mb-2">📝</span>
+            <span className="font-medium text-sm">Practice Test</span>
+            <p className="text-xs text-text-muted mt-1">All questions</p>
+          </Card>
+        </Link>
       </div>
 
       {/* FSRS Schedule */}
