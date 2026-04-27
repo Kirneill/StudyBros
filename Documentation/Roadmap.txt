@@ -1,0 +1,307 @@
+================================================================================
+                    AI STUDY GUIDE - COMPREHENSIVE BUILD PLAN
+================================================================================
+                        Generated: 2026-01-12
+================================================================================
+
+PROJECT STATUS: Phase 1 MVP 100% Complete
+
+This document outlines the complete implementation plan and current status of
+the AI Study Guide application - a tool that transforms learning materials into
+structured study assets (flashcards, quizzes, practice tests, audio summaries).
+
+================================================================================
+                              ARCHITECTURE OVERVIEW
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              AI STUDY GUIDE                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  CLI Layer (cli.py)                                                         │
+│  ├── ingest      - Process files from directory                            │
+│  ├── list        - View documents, chunks, study sets                      │
+│  ├── generate    - Create flashcards, quizzes, tests, summaries            │
+│  ├── export      - Output to JSON, Anki CSV, Markdown                      │
+│  └── status      - Show system status and stats                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Ingestion Layer                                                            │
+│  ├── FileScanner      - Discover supported files                           │
+│  ├── Extractors       - PPTX, PDF, TXT/MD, Video/Audio                     │
+│  └── TextChunker      - Split content for generation                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Generation Layer                                                           │
+│  ├── Schemas          - Pydantic models for structured outputs             │
+│  ├── Prompts          - LLM generation prompts                             │
+│  └── Generator        - OpenAI API integration                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Export Layer                                                               │
+│  ├── JSONExporter     - Canonical format                                   │
+│  ├── AnkiExporter     - Flashcard CSV for Anki                            │
+│  └── MarkdownExporter - Human-readable format                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Storage Layer (SQLite)                                                     │
+│  ├── Sources          - Ingested files                                     │
+│  ├── Documents        - Extracted content                                  │
+│  ├── Chunks           - Text segments                                      │
+│  └── StudySets        - Generated materials                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                         IMPLEMENTATION STATUS
+================================================================================
+
+MILESTONE 0: Project Setup ✅ COMPLETE
+--------------------------------------
+[✓] Project structure with proper Python packaging
+[✓] pyproject.toml with all dependencies
+[✓] requirements.txt for pip installation
+[✓] .env.example with configuration template
+[✓] Makefile with development commands
+[✓] README.md with comprehensive documentation
+[✓] Configuration management (config.py)
+
+MILESTONE 1: Ingestion Pipeline ✅ COMPLETE
+-------------------------------------------
+[✓] FileScanner - discovers supported files in directories
+[✓] ScannedFile dataclass with hash computation
+[✓] PPTXExtractor - extracts text from PowerPoint slides
+[✓] PDFExtractor - extracts text from PDF documents
+[✓] TextExtractor - handles TXT and Markdown files
+[✓] VideoExtractor - extracts audio and transcribes via Whisper
+[✓] AudioProcessor - FFmpeg integration for audio handling
+
+MILESTONE 2: Database + Chunking ✅ COMPLETE
+--------------------------------------------
+[✓] SQLAlchemy models (Source, Document, Chunk, StudySet)
+[✓] Database schema initialization
+[✓] CRUD operations for all entities
+[✓] Smart chunking by paragraphs/headings
+[✓] Fixed-size chunking with overlap (fallback)
+[✓] Minimum chunk size filtering
+
+MILESTONE 3: Generation ✅ COMPLETE
+-----------------------------------
+[✓] Pydantic schemas for structured outputs:
+    - Flashcard, FlashcardSet
+    - QuizOption, QuizQuestion, Quiz
+    - PracticeTestQuestion, PracticeTest
+[✓] Generation prompts for each type
+[✓] StudyMaterialGenerator with OpenAI integration
+[✓] Cost guardrails (max chunks, max tokens)
+[✓] Generate from chunks with limits
+
+MILESTONE 4: Export ✅ COMPLETE
+-------------------------------
+[✓] BaseExporter interface
+[✓] JSONExporter - canonical format with metadata
+[✓] AnkiExporter - semicolon-separated CSV for Anki import
+[✓] MarkdownExporter - formatted output for flashcards/quizzes/tests
+[✓] Factory function for exporter selection
+
+MILESTONE 5: Testing ✅ COMPLETE
+--------------------------------
+[✓] Pytest configuration (conftest.py)
+[✓] Test fixtures (temp_dir, test_db, sample data)
+[✓] Extraction tests
+[✓] Database operation tests
+[✓] Chunking tests
+[✓] Export format tests
+[✓] Schema validation tests
+
+MILESTONE 6: CLI Interface ✅ COMPLETE
+--------------------------------------
+[✓] Click-based CLI with command groups
+[✓] Rich console output with tables and progress
+[✓] init - database initialization
+[✓] status - configuration and stats display
+[✓] ingest - file processing with skip-existing option
+[✓] list documents/chunks/sets
+[✓] generate flashcards/quiz/test
+[✓] export with format selection
+[✓] show - display study set content
+
+================================================================================
+                         COMPLETED FEATURES
+================================================================================
+
+AUDIO SUMMARY FEATURE ✅ COMPLETE
+---------------------------------
+[✓] AudioSummary Pydantic schema with KeyConcept model
+[✓] Audio summary generation prompt (TTS-friendly output)
+[✓] CLI command: generate summary --doc ID --points N
+[✓] Markdown export support for audio summaries
+[✓] Database stats tracking for audio_summary type
+
+ENHANCED TEST DATA ✅ COMPLETE
+------------------------------
+[✓] Script to generate sample PPTX file (tests/create_test_files.py)
+[✓] Script to generate sample PDF file (tests/create_test_files.py)
+[✓] Integration tests for full workflow (tests/test_integration.py)
+[✓] Audio summary schema tests
+[✓] Audio summary export tests
+
+================================================================================
+                         STUDY METHODS SUPPORTED
+================================================================================
+
+1. FLASHCARDS (Q/A) ✅
+   - Question on front, answer on back
+   - Tags for categorization
+   - Difficulty levels (easy, medium, hard)
+   - Export to Anki CSV for spaced repetition
+
+2. POP QUIZ (Multiple Choice) ✅
+   - 4 answer options (A, B, C, D)
+   - Correct answer indication
+   - Explanations for each question
+
+3. PRACTICE TEST (Mixed Types) ✅
+   - Multiple choice questions
+   - True/False questions
+   - Short answer questions
+   - Point values and total scoring
+   - Comprehensive answer key
+
+4. AUDIO SUMMARY (TTS) ✅
+   - Text-based summary generation (TTS-friendly format)
+   - Key concepts with importance levels
+   - Main takeaways as complete sentences
+   - Overview and conclusion sections
+   - Estimated read-aloud time calculation
+
+================================================================================
+                         INPUT FORMATS SUPPORTED
+================================================================================
+
+DOCUMENTS:
+- .pptx - PowerPoint presentations (slides, notes, tables)
+- .pdf  - PDF documents (all pages)
+- .txt  - Plain text files
+- .md   - Markdown files (with title extraction)
+
+VIDEO/AUDIO:
+- .mp4, .mov, .webm, .avi, .mkv - Video files
+- .mp3, .wav, .m4a, .aac, .ogg  - Audio files
+- Automatic audio extraction from video
+- Chunked transcription for large files (>25MB limit)
+
+================================================================================
+                         OUTPUT FORMATS SUPPORTED
+================================================================================
+
+- JSON: Canonical format with full metadata
+- Anki CSV: Semicolon-separated for direct Anki import
+- Markdown: Human-readable formatted documents
+
+================================================================================
+                         COST GUARDRAILS
+================================================================================
+
+1. AUDIO TRANSCRIPTION:
+   - Audio chunked to ≤20MB segments
+   - Converted to mono 16kHz 64kbps MP3
+   - Reduces file size and API costs
+
+2. TEXT GENERATION:
+   - Max 5 chunks per generation (configurable)
+   - Max 4000 tokens per response (configurable)
+   - Token usage tracked per study set
+
+3. CONFIGURABLE LIMITS:
+   - STUDY_GUIDE_MAX_CHUNKS_PER_GENERATION
+   - STUDY_GUIDE_MAX_TOKENS_PER_RESPONSE
+   - STUDY_GUIDE_AUDIO_CHUNK_SIZE_MB
+
+================================================================================
+                         CONFIGURATION
+================================================================================
+
+Required:
+  OPENAI_API_KEY           - OpenAI API key for generation and transcription
+
+Optional:
+  STUDY_GUIDE_DB_PATH      - Database file path (default: ./data/study_guide.db)
+  STUDY_GUIDE_EXPORT_DIR   - Export directory (default: ./data/exports)
+  STUDY_GUIDE_GENERATION_MODEL      - GPT model (default: gpt-4o)
+  STUDY_GUIDE_TRANSCRIPTION_MODEL   - Whisper model (default: whisper-1)
+  STUDY_GUIDE_MAX_CHUNKS_PER_GENERATION  - Chunks limit (default: 5)
+  STUDY_GUIDE_MAX_TOKENS_PER_RESPONSE    - Token limit (default: 4000)
+  STUDY_GUIDE_AUDIO_CHUNK_SIZE_MB        - Audio chunk size (default: 20)
+
+================================================================================
+                         CLI REFERENCE
+================================================================================
+
+# Initialize database
+python -m study_guide init
+
+# Show status
+python -m study_guide status
+
+# Ingest files
+python -m study_guide ingest ./materials
+python -m study_guide ingest ./materials --skip-existing
+
+# List content
+python -m study_guide list documents [--limit N]
+python -m study_guide list chunks --doc ID [--limit N]
+python -m study_guide list sets [--limit N]
+
+# Generate study materials
+python -m study_guide generate flashcards --doc ID [--count N]
+python -m study_guide generate quiz --doc ID [--count N]
+python -m study_guide generate test --doc ID [--count N]
+python -m study_guide generate summary --doc ID [--points N]
+
+# Export study sets
+python -m study_guide export SET_ID --format json
+python -m study_guide export SET_ID --format anki
+python -m study_guide export SET_ID --format markdown
+python -m study_guide export SET_ID -o ./custom/path.json
+
+# Show study set content
+python -m study_guide show SET_ID
+
+================================================================================
+                         PHASE 2 ROADMAP (Future)
+================================================================================
+
+1. FASTAPI BACKEND
+   - REST API for all operations
+   - File upload endpoint
+   - WebSocket for progress updates
+
+2. NEXT.JS FRONTEND
+   - File upload with drag-and-drop
+   - Document browser
+   - Study set preview
+   - Export download
+
+3. ADDITIONAL FEATURES
+   - YouTube link ingestion
+   - Batch generation
+   - Study set merging
+   - Spaced repetition scheduling
+
+================================================================================
+                         PHASE 3 ROADMAP (Future)
+================================================================================
+
+1. ADVANCED INGESTION
+   - YouTube automatic transcription
+   - Web page scraping
+   - Google Docs integration
+
+2. LEARNING FEATURES
+   - Spaced repetition algorithm
+   - Progress tracking
+   - Performance analytics
+   - Study scheduling
+
+3. MULTI-USER
+   - User authentication
+   - Shared study sets
+   - Collaboration features
+   - Role-based access
+
+================================================================================

@@ -1,0 +1,16 @@
+Must be pptx type
+If you prepare slides for internal demos or practice presentations, include them here.
+
+Suggested content:
+
+Problem & motivation
+
+Architecture overview
+
+Design highlights
+
+Capstone I accomplishments
+
+Next steps
+
+Strong slides prepared early reduce stress later.

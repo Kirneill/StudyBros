@@ -1,0 +1,323 @@
+================================================================================
+                        AI STUDY GUIDE - IMPLEMENTATION PLAN
+================================================================================
+
+PROJECT OVERVIEW
+----------------
+Build a Python CLI application that transforms learning materials into 
+structured study assets (flashcards, quizzes, practice tests, audio summaries).
+
+PHASE 1 SCOPE (MVP - This Implementation)
+------------------------------------------
+✓ Python CLI with minimal FastAPI option
+✓ Ingest folder of files (PPTX, PDF, TXT, MD, MP4/MOV/WEBM)
+✓ Extract text from documents, transcribe video/audio
+✓ Store in SQLite database
+✓ Generate flashcards and quizzes using OpenAI Structured Outputs
+✓ Export to JSON, Anki CSV, Markdown
+
+================================================================================
+                              DIRECTORY STRUCTURE
+================================================================================
+
+study_guide/
+├── __init__.py
+├── __main__.py                 # CLI entry point
+├── cli.py                      # Click CLI commands
+├── config.py                   # Configuration management
+├── database/
+│   ├── __init__.py
+│   ├── models.py               # SQLAlchemy models
+│   ├── schema.py               # DB initialization
+│   └── operations.py           # CRUD operations
+├── ingestion/
+│   ├── __init__.py
+│   ├── scanner.py              # File discovery
+│   ├── extractors/
+│   │   ├── __init__.py
+│   │   ├── base.py             # Base extractor interface
+│   │   ├── pptx_extractor.py   # PowerPoint extraction
+│   │   ├── pdf_extractor.py    # PDF extraction
+│   │   ├── text_extractor.py   # TXT/MD extraction
+│   │   └── video_extractor.py  # Video → audio → transcript
+│   └── chunker.py              # Text chunking logic
+├── generation/
+│   ├── __init__.py
+│   ├── schemas.py              # Pydantic schemas for structured outputs
+│   ├── prompts.py              # Generation prompts
+│   └── generator.py            # OpenAI generation logic
+├── export/
+│   ├── __init__.py
+│   ├── json_export.py          # JSON export
+│   ├── anki_export.py          # Anki CSV export
+│   └── markdown_export.py      # Markdown export
+└── utils/
+    ├── __init__.py
+    └── audio.py                # FFmpeg audio utilities
+
+tests/
+├── __init__.py
+├── conftest.py                 # Pytest fixtures
+├── test_data/                  # Golden test inputs
+│   ├── sample.pptx
+│   ├── sample.pdf
+│   └── sample.txt
+├── test_extraction.py
+├── test_chunking.py
+├── test_generation.py
+└── test_export.py
+
+data/                           # Default data directory
+├── study_guide.db              # SQLite database
+└── exports/                    # Export output directory
+
+.env.example
+.gitignore
+Makefile
+README.md
+pyproject.toml
+requirements.txt
+
+================================================================================
+                              DATABASE SCHEMA
+================================================================================
+
+TABLE: sources
+--------------
+- id: INTEGER PRIMARY KEY
+- filename: TEXT NOT NULL
+- filepath: TEXT NOT NULL
+- file_type: TEXT NOT NULL (pptx, pdf, txt, md, video)
+- file_hash: TEXT (for deduplication)
+- created_at: TIMESTAMP
+- status: TEXT (pending, processing, completed, failed)
+
+TABLE: documents
+----------------
+- id: INTEGER PRIMARY KEY
+- source_id: INTEGER FOREIGN KEY → sources.id
+- title: TEXT
+- raw_text: TEXT NOT NULL
+- word_count: INTEGER
+- created_at: TIMESTAMP
+
+TABLE: chunks
+-------------
+- id: INTEGER PRIMARY KEY
+- document_id: INTEGER FOREIGN KEY → documents.id
+- chunk_index: INTEGER
+- content: TEXT NOT NULL
+- char_count: INTEGER
+- created_at: TIMESTAMP
+
+TABLE: study_sets
+-----------------
+- id: INTEGER PRIMARY KEY
+- document_id: INTEGER FOREIGN KEY → documents.id (nullable for multi-doc sets)
+- set_type: TEXT (flashcards, quiz, practice_test)
+- title: TEXT
+- content_json: TEXT (JSON blob of generated content)
+- item_count: INTEGER
+- created_at: TIMESTAMP
+
+TABLE: jobs (optional tracking)
+-------------------------------
+- id: INTEGER PRIMARY KEY
+- job_type: TEXT (ingest, generate, export)
+- status: TEXT (pending, running, completed, failed)
+- details: TEXT (JSON)
+- created_at: TIMESTAMP
+- completed_at: TIMESTAMP
+
+================================================================================
+                              PYDANTIC SCHEMAS
+================================================================================
+
+class Flashcard(BaseModel):
+    question: str
+    answer: str
+    tags: list[str] = []
+    difficulty: Literal["easy", "medium", "hard"]
+
+class FlashcardSet(BaseModel):
+    cards: list[Flashcard]
+
+class QuizOption(BaseModel):
+    label: str  # A, B, C, D
+    text: str
+
+class QuizQuestion(BaseModel):
+    prompt: str
+    options: list[QuizOption]
+    correct_index: int
+    explanation: str
+
+class Quiz(BaseModel):
+    questions: list[QuizQuestion]
+
+class PracticeTestQuestion(BaseModel):
+    question_type: Literal["multiple_choice", "short_answer", "true_false"]
+    prompt: str
+    options: list[QuizOption] | None = None  # for MC
+    correct_answer: str
+    explanation: str
+    points: int = 1
+
+class PracticeTest(BaseModel):
+    questions: list[PracticeTestQuestion]
+    total_points: int
+
+================================================================================
+                              CLI COMMANDS
+================================================================================
+
+# Ingest files from a directory
+python -m study_guide ingest ./materials
+
+# List ingested documents
+python -m study_guide list documents
+python -m study_guide list chunks --doc <id>
+python -m study_guide list sets
+
+# Generate study materials
+python -m study_guide generate flashcards --doc <id> [--count 20]
+python -m study_guide generate quiz --doc <id> [--count 10]
+python -m study_guide generate test --doc <id> [--count 20]
+
+# Export study sets
+python -m study_guide export <set_id> --format json
+python -m study_guide export <set_id> --format anki
+python -m study_guide export <set_id> --format markdown
+
+# Show status
+python -m study_guide status
+
+================================================================================
+                              IMPLEMENTATION ORDER
+================================================================================
+
+STEP 1: Project Setup (Milestone 0)
+------------------------------------
+[x] Create project structure
+[x] Set up pyproject.toml with dependencies
+[x] Create requirements.txt
+[x] Create .env.example
+[x] Create Makefile
+[x] Create README.md
+[x] Create .gitignore
+
+STEP 2: Database Layer (Milestone 2 - partial)
+----------------------------------------------
+[x] Define SQLAlchemy models
+[x] Create database initialization
+[x] Implement CRUD operations
+
+STEP 3: Ingestion Pipeline (Milestone 1)
+----------------------------------------
+[x] File scanner (discover supported files)
+[x] PPTX extractor (python-pptx)
+[x] PDF extractor (pypdf)
+[x] Text/MD extractor
+[x] Video extractor (ffmpeg + OpenAI Whisper)
+[x] Audio chunking for large files
+
+STEP 4: Chunking (Milestone 2 - complete)
+-----------------------------------------
+[x] Smart chunking by paragraphs/headings
+[x] Fallback fixed-size chunking
+[x] Store chunks in database
+
+STEP 5: Generation (Milestone 3)
+--------------------------------
+[x] Define Pydantic schemas for structured outputs
+[x] Create generation prompts
+[x] Implement flashcard generation
+[x] Implement quiz generation
+[x] Implement practice test generation
+[x] Add cost guardrails (max chunks, token limits)
+
+STEP 6: Export (Milestone 4)
+----------------------------
+[x] JSON export (canonical format)
+[x] Anki CSV export (front/back columns)
+[x] Markdown export (formatted quiz/test)
+
+STEP 7: CLI Interface
+---------------------
+[x] Click-based CLI
+[x] All commands implemented
+[x] Help text and documentation
+
+STEP 8: Testing (Milestone 5)
+-----------------------------
+[x] Sample test data
+[x] Extraction tests
+[x] Schema validation tests
+[x] Export format tests
+
+================================================================================
+                              DEPENDENCIES
+================================================================================
+
+Core:
+- click>=8.1.0          # CLI framework
+- python-dotenv>=1.0.0  # Environment management
+- sqlalchemy>=2.0.0     # ORM
+- pydantic>=2.0.0       # Data validation
+
+Extraction:
+- python-pptx>=0.6.21   # PowerPoint extraction
+- pypdf>=3.0.0          # PDF extraction
+
+AI/Generation:
+- openai>=1.0.0         # OpenAI API (Whisper + GPT)
+
+Audio/Video:
+- ffmpeg-python>=0.2.0  # FFmpeg wrapper
+
+Testing:
+- pytest>=7.0.0         # Testing framework
+- pytest-cov>=4.0.0     # Coverage
+
+================================================================================
+                              COST GUARDRAILS
+================================================================================
+
+1. Audio Transcription:
+   - Chunk audio into segments ≤ 25MB
+   - Use lower bitrate (mono, 64kbps) to reduce file size
+
+2. Text Generation:
+   - Max 5 chunks per generation call
+   - Max 4000 tokens per response
+   - Configurable via environment variables
+
+3. Rate Limiting:
+   - Add delays between API calls if needed
+   - Track token usage in job metadata
+
+================================================================================
+                              ENVIRONMENT VARIABLES
+================================================================================
+
+# Required
+OPENAI_API_KEY=sk-...
+
+# Optional
+STUDY_GUIDE_DB_PATH=./data/study_guide.db
+STUDY_GUIDE_EXPORT_DIR=./data/exports
+STUDY_GUIDE_MAX_CHUNKS_PER_GENERATION=5
+STUDY_GUIDE_MAX_TOKENS_PER_RESPONSE=4000
+STUDY_GUIDE_AUDIO_CHUNK_SIZE_MB=20
+
+================================================================================
+                              NOTES
+================================================================================
+
+- Using OpenAI's Structured Outputs (response_format with JSON schema) for 
+  reliable parsing of flashcards/quizzes
+- SQLite for simplicity - can migrate to PostgreSQL for Phase 2
+- No vector DB in Phase 1 - direct chunk-based generation
+- FFmpeg required for video/audio processing (system dependency)
+
+================================================================================

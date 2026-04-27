@@ -1,0 +1,25 @@
+You may include short practice videos.
+
+If included:
+
+Add an index.html linking to unlisted/public YouTube videos.
+
+Suggested ideas:
+
+Team introduction
+
+Concept explanation
+
+Prototype demo
+
+Capstone II roadmap
+
+PLEASE MENTION CODE DIRECTORY IN Code folder's README.md AND the PowerPoint slides!!!!!!!!!!!!!!!!!!!!!! (Just that they exist, that it)
+
+
+prof:
+The Videos directory must include only one file named index.html that contains the link to the four videos published in YouTube. Please do make sure to test the index.html file. 
+
+When I open it in a browser, I should be able to see the list of all the videos and after clicking on each hyperlink video, it should play the video deployed on YouTube. Do make sure that all your videos are submitted to the YouTube account that I provide to you (if I cannot access your videos, you will not receive the corresponding points). 
+
+To make sure that there would be no issues with accessing the YouTube account, do not wait until the very last days. You would want to make sure that you can access and upload the account as soon as possible.
