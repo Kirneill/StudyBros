@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button, Card, Modal, Spinner, Toast } from "@/components/ui";
+import { Button, Card, ErrorState, Modal, Spinner, Toast } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
@@ -51,7 +51,7 @@ function getStoredProviderKeys(): ProviderKeyState {
 
   const storedKeys: ProviderKeyState = {};
   (["openai", "anthropic", "openrouter"] as GenerationProvider[]).forEach((candidate) => {
-    const key = window.localStorage.getItem(`${PROVIDER_STORAGE_PREFIX}${candidate}`);
+    const key = window.sessionStorage.getItem(`${PROVIDER_STORAGE_PREFIX}${candidate}`);
     if (key) {
       storedKeys[candidate] = key;
     }
@@ -64,8 +64,8 @@ export default function GeneratePage() {
   const router = useRouter();
   const docId = Number(params.id);
 
-  const { data: doc, loading } = useApi(useCallback(() => api.getDocument(docId), [docId]));
-  const { data: providerData, loading: loadingProviders } = useApi(
+  const { data: doc, error: docError, loading, refetch: refetchDoc } = useApi(useCallback(() => api.getDocument(docId), [docId]));
+  const { data: providerData, error: providersError, loading: loadingProviders, refetch: refetchProviders } = useApi(
     useCallback(() => api.getGenerationProviders(), []),
   );
 
@@ -79,6 +79,11 @@ export default function GeneratePage() {
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [pendingKey, setPendingKey] = useState("");
   const [keyModalMessage, setKeyModalMessage] = useState<string | null>(null);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => () => {
+    if (navTimerRef.current) clearTimeout(navTimerRef.current);
+  }, []);
 
   const availableProviders = useMemo(
     () => providerData?.providers ?? [],
@@ -105,10 +110,10 @@ export default function GeneratePage() {
       const next = { ...current };
       if (normalized) {
         next[target] = normalized;
-        window.localStorage.setItem(`${PROVIDER_STORAGE_PREFIX}${target}`, normalized);
+        window.sessionStorage.setItem(`${PROVIDER_STORAGE_PREFIX}${target}`, normalized);
       } else {
         delete next[target];
-        window.localStorage.removeItem(`${PROVIDER_STORAGE_PREFIX}${target}`);
+        window.sessionStorage.removeItem(`${PROVIDER_STORAGE_PREFIX}${target}`);
       }
       return next;
     });
@@ -134,7 +139,7 @@ export default function GeneratePage() {
         api_key: apiKeyOverride ?? activeClientKey ?? undefined,
       });
       setToast({ message: `Generated ${result.item_count} items!`, type: "success" });
-      setTimeout(() => {
+      navTimerRef.current = setTimeout(() => {
         router.push(`/study-sets/${result.id}`);
         router.refresh();
       }, 1500);
@@ -176,6 +181,26 @@ export default function GeneratePage() {
     return <div className="flex items-center justify-center py-20"><Spinner size="lg" /></div>;
   }
 
+  if (docError) {
+    return (
+      <ErrorState
+        title="Failed to load document"
+        description={docError}
+        onRetry={refetchDoc}
+      />
+    );
+  }
+
+  if (providersError) {
+    return (
+      <ErrorState
+        title="Failed to load AI providers"
+        description={providersError}
+        onRetry={refetchProviders}
+      />
+    );
+  }
+
   return (
     <div>
       <Link href={`/documents/${docId}`} className="text-sm text-text-muted hover:text-text-primary transition-colors">&larr; Back to {doc?.title || "Document"}</Link>
@@ -184,13 +209,14 @@ export default function GeneratePage() {
 
       <div className="max-w-xl space-y-6">
         {/* Provider selection */}
-        <div>
-          <label className="text-sm font-medium mb-3 block">AI Provider</label>
+        <fieldset className="border-0 p-0 m-0">
+          <legend className="text-sm font-medium mb-3 block">AI Provider</legend>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {availableProviders.map((entry) => (
               <button
                 key={entry.provider}
                 onClick={() => setProvider(entry.provider)}
+                aria-pressed={effectiveProvider === entry.provider}
                 className={`p-4 rounded-xl border text-left transition-colors ${
                   effectiveProvider === entry.provider
                     ? "border-accent bg-accent/5 text-accent"
@@ -229,16 +255,17 @@ export default function GeneratePage() {
               </div>
             </Card>
           )}
-        </div>
+        </fieldset>
 
         {/* Type selection */}
-        <div>
-          <label className="text-sm font-medium mb-3 block">Material Type</label>
+        <fieldset className="border-0 p-0 m-0">
+          <legend className="text-sm font-medium mb-3 block">Material Type</legend>
           <div className="grid grid-cols-2 gap-3">
             {(Object.entries(STUDY_SET_TYPES) as [GenType, { label: string; icon: string }][]).map(([key, val]) => (
               <button
                 key={key}
                 onClick={() => setGenType(key)}
+                aria-pressed={genType === key}
                 className={`p-4 rounded-xl border text-left transition-colors ${
                   genType === key
                     ? "border-accent bg-accent/5 text-accent"
@@ -250,7 +277,7 @@ export default function GeneratePage() {
               </button>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         {/* Count */}
         <div>
@@ -273,13 +300,14 @@ export default function GeneratePage() {
         </div>
 
         {/* Difficulty */}
-        <div>
-          <label className="text-sm font-medium mb-3 block">Difficulty</label>
+        <fieldset className="border-0 p-0 m-0">
+          <legend className="text-sm font-medium mb-3 block">Difficulty</legend>
           <div className="flex gap-2">
             {(["easy", "medium", "hard", "mixed"] as const).map((d) => (
               <button
                 key={d}
                 onClick={() => setDifficulty(d)}
+                aria-pressed={difficulty === d}
                 className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
                   difficulty === d
                     ? "bg-accent text-bg-primary"
@@ -290,13 +318,14 @@ export default function GeneratePage() {
               </button>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         <Button size="lg" onClick={handleGenerate} loading={generating} disabled={generating} className="w-full">
           {generating ? "Generating with AI..." : "Generate"}
         </Button>
 
         <p className="text-xs text-text-muted text-center">
+          Generating the same type and count again will create a new study set (not overwrite).
           If the server does not have a key for the selected provider, you can enter your own and
           it will be stored locally in this browser.
         </p>

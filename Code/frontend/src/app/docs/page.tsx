@@ -8,7 +8,7 @@ export default function DocsPage() {
     <div className="min-h-screen flex flex-col">
       <LandingNav />
 
-      <main className="flex-1 py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
+      <main id="main-content" className="flex-1 py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           {/* Page header */}
           <AnimateIn>
@@ -134,10 +134,10 @@ export default function DocsPage() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="pb-3 pr-8 text-sm font-semibold text-text-muted">
+                        <th scope="col" className="pb-3 pr-8 text-sm font-semibold text-text-muted">
                           Category
                         </th>
-                        <th className="pb-3 text-sm font-semibold text-text-muted">
+                        <th scope="col" className="pb-3 text-sm font-semibold text-text-muted">
                           Formats
                         </th>
                       </tr>

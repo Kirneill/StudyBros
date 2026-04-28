@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { AnimateIn } from "@/components/AnimateIn";
-import { Card, CardHeader, CardTitle, Spinner, EmptyState } from "@/components/ui";
+import { Card, CardHeader, CardTitle, Spinner, EmptyState, ErrorState } from "@/components/ui";
 import {
   KnowledgeHeatMap,
   MasteryTree,
@@ -14,18 +14,29 @@ import {
 } from "@/components/gamification";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
+import Link from "next/link";
 
 export default function ProgressPage() {
-  const { data: progress, loading: loadingProgress } = useApi(useCallback(() => api.getProgress(), []));
-  const { data: phase, loading: loadingPhase } = useApi(useCallback(() => api.getPhase(), []));
-  const { data: consistency } = useApi(useCallback(() => api.getConsistency(), []));
-  const { data: sw } = useApi(useCallback(() => api.getStrengthsWeaknesses(), []));
+  const { data: progress, error: errorProgress, loading: loadingProgress, refetch: refetchProgress } = useApi(useCallback(() => api.getProgress(), []));
+  const { data: phase, error: errorPhase, loading: loadingPhase, refetch: refetchPhase } = useApi(useCallback(() => api.getPhase(), []));
+  const { data: consistency, error: errorConsistency } = useApi(useCallback(() => api.getConsistency(), []));
+  const { data: sw, error: errorSw } = useApi(useCallback(() => api.getStrengthsWeaknesses(), []));
 
   if (loadingProgress || loadingPhase) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  if (errorProgress || errorPhase) {
+    return (
+      <ErrorState
+        title="Failed to load progress"
+        description={errorProgress ?? errorPhase ?? "An unexpected error occurred."}
+        onRetry={() => { refetchProgress(); refetchPhase(); }}
+      />
     );
   }
 
@@ -45,10 +56,13 @@ export default function ProgressPage() {
   }
 
   // Calculate overall accuracy from mastery levels
-  const avgMastery = progress.reduce((sum, p) => sum + p.mastery_level, 0) / progress.length;
+  const avgMastery = progress.reduce((sum, p) => sum + (p.mastery_level ?? 0), 0) / progress.length;
 
   return (
     <div>
+      <Link href="/dashboard" className="text-sm text-text-muted hover:text-text-primary transition-colors mb-6 inline-block">
+        ← Dashboard
+      </Link>
       <h1 className="font-[family-name:var(--font-heading)] text-3xl font-bold mb-8">Progress</h1>
 
       <div className="space-y-8">
@@ -91,6 +105,9 @@ export default function ProgressPage() {
           </AnimateIn>
 
           {/* Consistency */}
+          {errorConsistency && (
+            <p className="text-sm text-red-400">Failed to load consistency data.</p>
+          )}
           {consistency && (
             <AnimateIn delay={0.2}>
               <Card>
@@ -107,7 +124,10 @@ export default function ProgressPage() {
           )}
         </div>
 
-        {/* Calibration */}
+        {/* Calibration / Strengths & weaknesses */}
+        {errorSw && (
+          <p className="text-sm text-red-400">Failed to load strengths and weaknesses.</p>
+        )}
         {sw && (
           <AnimateIn delay={0.25}>
             <Card>

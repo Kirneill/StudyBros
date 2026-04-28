@@ -2,17 +2,17 @@
 
 import { useCallback } from "react";
 import { AnimateIn } from "@/components/AnimateIn";
-import { Card, CardHeader, CardTitle, Spinner, EmptyState } from "@/components/ui";
+import { Card, CardHeader, CardTitle, Spinner, EmptyState, ErrorState } from "@/components/ui";
 import { MasteryTree, ConsistencyStreak, AchievementBadge, PhaseIndicator } from "@/components/gamification";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import Link from "next/link";
 
 export default function DashboardPage() {
-  const { data: progress, loading: loadingProgress } = useApi(useCallback(() => api.getProgress(), []));
-  const { data: studySets, loading: loadingSets } = useApi(useCallback(() => api.listStudySets(), []));
-  const { data: achievements, loading: loadingAch } = useApi(useCallback(() => api.getAchievements(), []));
-  const { data: phase, loading: loadingPhase } = useApi(useCallback(() => api.getPhase(), []));
+  const { data: progress, error: errorProgress, loading: loadingProgress, refetch: refetchProgress } = useApi(useCallback(() => api.getProgress(), []));
+  const { data: studySets, error: errorSets, loading: loadingSets, refetch: refetchSets } = useApi(useCallback(() => api.listStudySets(), []));
+  const { data: achievements, error: errorAch, loading: loadingAch } = useApi(useCallback(() => api.getAchievements(), []));
+  const { data: phase, error: errorPhase, loading: loadingPhase } = useApi(useCallback(() => api.getPhase(), []));
   const { data: consistency } = useApi(useCallback(() => api.getConsistency(), []));
 
   const loading = loadingProgress || loadingSets;
@@ -22,6 +22,16 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  if (!loading && (errorProgress || errorSets)) {
+    return (
+      <ErrorState
+        title="Failed to load dashboard"
+        description={errorProgress ?? errorSets ?? "An unexpected error occurred."}
+        onRetry={() => { refetchProgress(); refetchSets(); }}
+      />
     );
   }
 
@@ -50,7 +60,7 @@ export default function DashboardPage() {
       <div className="space-y-8">
         {/* Due cards hero */}
         <AnimateIn>
-          <Link href="/study-sets" className="block">
+          <Link href="/study-sets" className="block focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 rounded-xl">
             <Card hover className="border-accent/20 bg-gradient-to-r from-bg-card to-accent/5">
               <div className="flex items-center justify-between">
                 <div>
@@ -60,13 +70,16 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-text-secondary text-sm mt-1">Pick up where you left off</p>
                 </div>
-                <div className="text-4xl">📖</div>
+                <div className="text-4xl" aria-hidden="true">📖</div>
               </div>
             </Card>
           </Link>
         </AnimateIn>
 
         {/* Phase indicator */}
+        {!loadingPhase && errorPhase && (
+          <p className="text-sm text-red-400">Failed to load learning phase.</p>
+        )}
         {!loadingPhase && phase && (
           <AnimateIn delay={0.1}>
             <PhaseIndicator phase={phase} />
@@ -103,6 +116,9 @@ export default function DashboardPage() {
           )}
 
           {/* Recent achievements */}
+          {!loadingAch && errorAch && (
+            <p className="text-sm text-red-400">Failed to load achievements.</p>
+          )}
           {!loadingAch && achievements && achievements.length > 0 && (
             <AnimateIn delay={0.25}>
               <Card>
@@ -115,8 +131,8 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <div className="space-y-2">
-                  {achievements.slice(0, 3).map((a, i) => (
-                    <AchievementBadge key={i} achievement={a} compact />
+                  {achievements.slice(0, 3).map((a) => (
+                    <AchievementBadge key={`${a.type}-${a.title}`} achievement={a} compact />
                   ))}
                 </div>
               </Card>

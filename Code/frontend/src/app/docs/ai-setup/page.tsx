@@ -16,16 +16,18 @@ export default function AISetupPage() {
     <div className="min-h-screen flex flex-col">
       <LandingNav />
 
-      <main className="flex-1 py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
+      <main id="main-content" className="flex-1 py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           {/* Page header */}
-          <AnimateIn>
+          <AnimateIn delay={0}>
             <Link
               href="/docs"
               className="text-sm text-text-muted hover:text-text-primary transition-colors mb-6 inline-block"
             >
               &larr; Back to Docs
             </Link>
+          </AnimateIn>
+          <AnimateIn>
             <h1 className="font-[family-name:var(--font-heading)] text-4xl sm:text-5xl font-bold mb-4">
               AI Setup
             </h1>
@@ -155,9 +157,9 @@ export default function AISetupPage() {
                       <span className="font-[family-name:var(--font-mono)] text-4xl font-bold text-accent block mb-1">
                         {item.count}
                       </span>
-                      <span className="font-[family-name:var(--font-heading)] text-lg font-semibold block mb-2">
+                      <h3 className="font-[family-name:var(--font-heading)] text-lg font-semibold mb-2">
                         {item.label}
-                      </span>
+                      </h3>
                       <p className="text-text-secondary text-sm">
                         {item.desc}
                       </p>

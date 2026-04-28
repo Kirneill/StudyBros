@@ -4,21 +4,31 @@ interface KnowledgeHeatMapProps {
   topics: Progress[];
 }
 
-export function KnowledgeHeatMap({ topics }: KnowledgeHeatMapProps) {
-  function getColor(level: number): string {
-    if (level >= 0.9) return "bg-mastery-gold";
-    if (level >= 0.7) return "bg-mastery-mastered";
-    if (level >= 0.3) return "bg-mastery-learning";
-    if (level > 0) return "bg-mastery-review";
-    return "bg-mastery-none";
-  }
+function getColor(level: number): string {
+  if (level >= 0.9) return "bg-mastery-gold";
+  if (level >= 0.7) return "bg-mastery-mastered";
+  if (level >= 0.3) return "bg-mastery-learning";
+  if (level > 0) return "bg-mastery-review";
+  return "bg-mastery-none";
+}
 
+function getMasteryLabel(level: number): string {
+  if (level >= 0.9) return "Deep Mastery";
+  if (level >= 0.7) return "Mastered";
+  if (level >= 0.3) return "Learning";
+  if (level > 0) return "Started";
+  return "Not Started";
+}
+
+export function KnowledgeHeatMap({ topics }: KnowledgeHeatMapProps) {
   return (
     <div>
       <div className="flex flex-wrap gap-2">
         {topics.map((t) => (
           <div
             key={t.topic}
+            role="img"
+            aria-label={`${t.topic}: ${getMasteryLabel(t.mastery_level)}`}
             className={`w-8 h-8 rounded-md ${getColor(t.mastery_level)} transition-colors`}
             title={`${t.topic}: ${Math.round(t.mastery_level * 100)}% mastery`}
           />

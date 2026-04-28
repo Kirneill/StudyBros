@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, Button, Badge, Spinner, Modal, Toast } from "@/components/ui";
+import { Card, CardHeader, CardTitle, Button, Badge, Spinner, Modal, Toast, ErrorState } from "@/components/ui";
 import { ForgettingCurve } from "@/components/gamification";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
@@ -34,7 +34,7 @@ export default function StudySetDetailPage() {
   const router = useRouter();
   const id = Number(params.id);
 
-  const { data: studySet, loading } = useApi(useCallback(() => api.getStudySet(id), [id]));
+  const { data: studySet, loading, error, refetch } = useApi(useCallback(() => api.getStudySet(id), [id]));
   const { data: schedule } = useApi(useCallback(() => api.getSchedule(id), [id]));
 
   const [showDelete, setShowDelete] = useState(false);
@@ -59,6 +59,16 @@ export default function StudySetDetailPage() {
     return <div className="flex items-center justify-center py-20"><Spinner size="lg" /></div>;
   }
 
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load study set"
+        description={error}
+        onRetry={refetch}
+      />
+    );
+  }
+
   if (!studySet) {
     return <p className="text-text-muted py-8">Study set not found.</p>;
   }
@@ -78,10 +88,10 @@ export default function StudySetDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <a href={api.getExportUrl(id, "json")} download className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent bg-bg-card border border-border text-text-primary hover:bg-bg-card-hover px-3 py-1.5 text-sm">
+          <a href={api.getExportUrl(id, "json")} download className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 bg-bg-card border border-border text-text-primary hover:bg-bg-card-hover px-3 py-1.5 text-sm">
             Export JSON
           </a>
-          <a href={api.getExportUrl(id, "markdown")} download className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent bg-bg-card border border-border text-text-primary hover:bg-bg-card-hover px-3 py-1.5 text-sm">
+          <a href={api.getExportUrl(id, "markdown")} download className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 bg-bg-card border border-border text-text-primary hover:bg-bg-card-hover px-3 py-1.5 text-sm">
             Export MD
           </a>
           <Button variant="ghost" size="sm" onClick={() => setShowDelete(true)}>Delete</Button>
@@ -92,7 +102,7 @@ export default function StudySetDetailPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <Link href={`/study-sets/${id}/study`}>
           <Card hover className="text-center py-5 border-accent/20 hover:border-accent/40">
-            <span className="text-2xl block mb-2">📖</span>
+            <span className="text-2xl block mb-2" aria-hidden="true">📖</span>
             <span className="font-medium text-sm">Study Flashcards</span>
             {schedule && schedule.due_count > 0 && (
               <p className="text-xs text-warning mt-1">{schedule.due_count} cards due</p>
@@ -101,14 +111,14 @@ export default function StudySetDetailPage() {
         </Link>
         <Link href={`/study-sets/${id}/quiz`}>
           <Card hover className="text-center py-5">
-            <span className="text-2xl block mb-2">❓</span>
+            <span className="text-2xl block mb-2" aria-hidden="true">❓</span>
             <span className="font-medium text-sm">Take Quiz</span>
             <p className="text-xs text-text-muted mt-1">One at a time</p>
           </Card>
         </Link>
         <Link href={`/study-sets/${id}/test`}>
           <Card hover className="text-center py-5">
-            <span className="text-2xl block mb-2">📝</span>
+            <span className="text-2xl block mb-2" aria-hidden="true">📝</span>
             <span className="font-medium text-sm">Practice Test</span>
             <p className="text-xs text-text-muted mt-1">All questions</p>
           </Card>

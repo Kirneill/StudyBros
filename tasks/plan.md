@@ -1,176 +1,106 @@
-# StudyBros — Ship-to-Vercel Plan
+# StudyBros — Impeccable Audit Fix Plan
 
 ## Current State
 
-**Done:** Phases 0–6 complete. MCP server (stdio, 10 tools, 9 resources, 8 prompts), FastAPI backend (all routes, gamification, FSRS), Next.js frontend (20 pages, gamification UI, study modes), 11 bug fixes. Backend test suite: 206 passed. Frontend: lint + build clean.
+**Done:** Phases 0–6, landing page overhaul, docs pages, initial code-reviewer audit (42 findings, 16 fixed).  
+**Just Completed:** Impeccable UI engineering audit — 110 findings (21 CRITICAL, 52 HIGH, 32 MEDIUM, 5 LOW).  
+**Not done:** Fix all 110 audit findings, then Vercel deployment.
 
-**Not done:** Landing page is a placeholder. No UI/UX audit. Not deployed to Vercel. Backend has no production host.
-
-## What Remains — 3 Phases
-
-```
-Phase A: Landing Page Overhaul
-  → USER REVIEW CHECKPOINT
-Phase B: UI/UX Audit + Fixes
-  → USER REVIEW CHECKPOINT
-Phase C: Vercel Deployment
-  → LIVE VERIFICATION
-```
-
----
-
-## Phase A: Landing Page Overhaul
-
-### Dependency Graph
+## Dependency Graph
 
 ```
-A1 (Landing page build) → A2 (Lint + build verify) → A3 (User review)
+                    ┌─────────────────────┐
+                    │ lib/hooks.ts        │  useApi (already has error field)
+                    │ lib/types.ts        │  Type definitions
+                    │ lib/constants.ts    │  Color/rating constants
+                    └────────┬────────────┘
+                             │ imported by everything
+    ┌────────────────────────┼────────────────────────┐
+    ▼                        ▼                        ▼
+┌──────────┐      ┌──────────────────┐     ┌──────────────────┐
+│ UI comps │      │ Gamification     │     │ Layouts / Global │
+│ Button   │      │ KnowledgeHeatMap │     │ layout.tsx       │
+│ Modal    │      │ ForgettingCurve  │     │ (app)/layout.tsx │
+│ Toast    │      │ DifficultyMeter  │     │ error.tsx        │
+│ Spinner  │      │ MasteryTree      │     │ not-found.tsx    │
+│ Skeleton │      │ ConsistencyStreak│     │ AnimateIn.tsx    │
+│ etc.     │      │ etc.             │     │ LandingNav.tsx   │
+└─────┬────┘      └────────┬─────────┘     └────────┬─────────┘
+      │                    │                         │
+      └────────────────────┼─────────────────────────┘
+                           ▼ used by
+              ┌─────────────────────────┐
+              │      Page Components     │
+              │  dashboard  upload       │
+              │  documents  generate     │
+              │  study-sets study quiz   │
+              │  test  complete progress │
+              │  achievements docs       │
+              └─────────────────────────┘
 ```
 
-### Why This First
+**Key insight:** Shared components (UI + gamification) must be fixed FIRST because pages depend on them. Layouts/globals are parallel-safe with components since they don't import each other.
 
-The landing page is the first thing users (and capstone reviewers) see. The current page is a generic hero with no feature breakdown, no explanation of the three delivery surfaces, and no persuasive copy. The behavioral economics research brief (in TODO.md) is complete — this is pure implementation.
+## Strategy: 5 Batches with Checkpoints
 
-### Scope
+### Batch 1 — Foundation Layer (shared components + layouts + new ErrorState)
+Create `ErrorState` component. Fix all UI components, gamification components, layouts, error boundaries, not-found, AnimateIn, LandingNav. These are leaf dependencies — no page files touched.
 
-Single file: `Code/frontend/src/app/page.tsx` (server component, outside `(app)` layout — no sidebar).
+**Parallel subagents (4):**
+- Agent A: UI components (Button, Modal, Toast, Spinner, Skeleton, ProgressBar, Badge, EmptyState)
+- Agent B: Gamification components (all 10)
+- Agent C: Layouts + error boundaries + not-found + AnimateIn
+- Agent D: LandingNav (mobile hamburger menu — largest single change in Batch 1)
 
-Uses existing design system: Tailwind 4 tokens, `AnimateIn` component, `Card`/`Button` from `ui/`. May need a few CSS-only additions in `globals.css` for the forgetting curve animation.
+### Batch 2 — Marketing Pages (no overlap with app pages)
+Fix landing page, docs, docs/ai-setup. These are server components that don't share files with app pages.
 
-### Sections (from research brief)
+**Parallel subagent (1):**
+- Agent E: All 3 marketing pages
 
-| # | Section | Content |
-|---|---------|---------|
-| 1 | Hero | Loss aversion headline + single primary CTA |
-| 2 | Problem | Forgetting curve visualization (CSS/SVG animated) |
-| 3 | Three Ways to Study | MCP Server, LLM Skills, Web App cards |
-| 4 | How It Works | Upload → Generate → Master (3-step flow) |
-| 5 | Science Section | FSRS, Bloom's, 85% rule — with plain-language explanations |
-| 6 | Comparison Table | StudyBros vs Anki vs Quizlet vs traditional study |
-| 7 | Social Proof | Research authority quotes (not fake testimonials) |
-| 8 | Instant Value CTA | Upload link embedded in page |
-| 9 | Footer CTA | Final loss-aversion push |
+### Batch 3 — App Pages: Documents & Upload Flow
+Fix dashboard, upload, documents, documents/[id], documents/[id]/generate, achievements, progress. Wire up `useApi` error + create ErrorState usage.
 
-### What NOT To Do
+**Parallel subagents (3):**
+- Agent F: dashboard + achievements + progress (read-only pages, similar patterns)
+- Agent G: upload (drag-drop keyboard access, file validation, aria-live)
+- Agent H: documents + documents/[id] + documents/[id]/generate (forms, modals, API keys)
 
-- No new npm dependencies (no chart libraries — use CSS/SVG)
-- No client-side interactivity beyond AnimateIn scroll animations
-- No backend changes
-- No new component files — everything inline in `page.tsx` (it's a marketing page, not reusable UI)
+### Batch 4 — App Pages: Study Flow (most complex)
+Fix study-sets list, study-sets/[id], study, quiz, test, complete. These have the most interactive a11y issues (focus management, aria-live, radiogroup semantics).
 
----
+**Parallel subagents (3):**
+- Agent I: study-sets/page.tsx + study-sets/[id]/page.tsx (list + detail)
+- Agent J: study/page.tsx (flashcard flow — C4, C6, C21, H16, H17, H34, H35, M17)
+- Agent K: quiz/page.tsx + test/page.tsx + complete/page.tsx (quiz/test flow — C5, C17–C20, H18–H20, M19–M21)
 
-## Phase B: UI/UX Audit + Fixes
+### Batch 5 — Verification Gate
+Build + lint. Verify all fixes. User review checkpoint.
 
-### Dependency Graph
+## File Ownership Map (no conflicts)
 
-```
-B1 (Audit all pages) → B2 (Fix critical issues) → B3 (Lint + build verify) → B4 (User review)
-```
+| Batch | Agent | Files (exclusive ownership) |
+|-------|-------|---------------------------|
+| 1 | A | `components/ui/Button.tsx`, `Modal.tsx`, `Toast.tsx`, `Spinner.tsx`, `Skeleton.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `EmptyState.tsx`, NEW `components/ui/ErrorState.tsx` |
+| 1 | B | All 10 `components/gamification/*.tsx` |
+| 1 | C | `app/layout.tsx`, `app/(app)/layout.tsx`, `app/error.tsx` (→ rename `global-error.tsx`), `app/(app)/error.tsx`, `app/not-found.tsx`, `components/AnimateIn.tsx` |
+| 1 | D | `components/LandingNav.tsx` |
+| 2 | E | `app/page.tsx`, `app/docs/page.tsx`, `app/docs/ai-setup/page.tsx` |
+| 3 | F | `app/(app)/dashboard/page.tsx`, `app/(app)/achievements/page.tsx`, `app/(app)/progress/page.tsx` |
+| 3 | G | `app/(app)/upload/page.tsx` |
+| 3 | H | `app/(app)/documents/page.tsx`, `app/(app)/documents/[id]/page.tsx`, `app/(app)/documents/[id]/generate/page.tsx` |
+| 4 | I | `app/(app)/study-sets/page.tsx`, `app/(app)/study-sets/[id]/page.tsx` |
+| 4 | J | `app/(app)/study-sets/[id]/study/page.tsx` |
+| 4 | K | `app/(app)/study-sets/[id]/quiz/page.tsx`, `app/(app)/study-sets/[id]/test/page.tsx`, `app/(app)/study-sets/[id]/complete/page.tsx` |
 
-### Why After Landing Page
+Zero file conflicts between parallel agents within any batch.
 
-The audit should cover the landing page too — build it first, audit everything together.
+## Checkpoint Gates
 
-### Scope
+After each batch:
+1. `npm run lint` — 0 errors
+2. `npm run build` — successful (all 17 routes)
+3. Diff review — verify changes match intended fixes
+4. No regressions — existing functionality preserved
 
-Audit all 20 frontend pages across these axes:
-
-| Axis | What to Check |
-|------|--------------|
-| **Accessibility** | Focus management, aria labels, color contrast, keyboard nav, screen reader text |
-| **Performance** | Unnecessary client components, bundle-impacting patterns, lazy loading |
-| **Resilience** | Empty states, loading states, error boundaries, API failure handling |
-| **Design Consistency** | Token usage, spacing, typography, component reuse, responsive behavior |
-| **UX Flow** | Navigation dead ends, confusing states, missing affordances |
-
-### Pages to Audit
-
-1. Landing page (`page.tsx`)
-2. Dashboard (`dashboard/page.tsx`)
-3. Upload (`upload/page.tsx`)
-4. Documents list (`documents/page.tsx`)
-5. Document detail (`documents/[id]/page.tsx`)
-6. Generate (`documents/[id]/generate/page.tsx`)
-7. Study sets list (`study-sets/page.tsx`)
-8. Study set detail (`study-sets/[id]/page.tsx`)
-9. Flashcard study (`study-sets/[id]/study/page.tsx`)
-10. Quiz (`study-sets/[id]/quiz/page.tsx`)
-11. Practice test (`study-sets/[id]/test/page.tsx`)
-12. Completion (`study-sets/[id]/complete/page.tsx`)
-13. Progress (`progress/page.tsx`)
-14. Achievements (`achievements/page.tsx`)
-15. Error boundary (`error.tsx`, `(app)/error.tsx`)
-16. Not found (`not-found.tsx`)
-17. Loading (`(app)/loading.tsx`)
-18. App layout + sidebar (`(app)/layout.tsx`)
-
-### Fix Strategy
-
-- **Critical** (a11y violations, broken flows, wrong data): Fix immediately
-- **High** (missing empty states, inconsistent tokens, responsive breaks): Fix in this phase
-- **Low** (polish, animation tweaks, copy improvements): Note but skip unless trivial
-
----
-
-## Phase C: Vercel Deployment
-
-### Dependency Graph
-
-```
-C1 (Backend deploy decision) → C2 (Update API URL config)
-C2 → C3 (Vercel project setup + deploy)
-C3 → C4 (Smoke test production)
-C4 → C5 (DNS/domain if applicable)
-```
-
-### Architecture Decision: Backend Hosting
-
-Vercel runs serverless Node.js — it cannot host the Python FastAPI backend. Options:
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **A: Railway** | One-click Python deploy, free tier, auto-sleep | Cold starts on free tier |
-| **B: Render** | Free tier, Docker support, auto-deploy from git | Cold starts on free tier, 15-min spin-down |
-| **C: Vercel serverless (rewrite API as Next.js routes)** | Single deploy, no separate host | Massive rewrite, SQLite won't persist on serverless |
-| **D: Skip backend deploy (frontend-only demo)** | Zero backend cost, fastest path | App shows empty states, no generation, no study flow |
-
-**Recommendation:** Option A or B (Railway or Render) for backend. The app needs a persistent SQLite file and long-running generation requests — serverless doesn't fit. This is a capstone demo, so free tier with cold starts is acceptable.
-
-**User must decide:** Which backend host? Or frontend-only demo?
-
-### Frontend Deploy Steps
-
-1. Update `vercel.json` rewrites to point to the production backend URL
-2. Set `API_URL` environment variable in Vercel project settings
-3. `vercel deploy` from `Code/frontend/`
-4. Verify: landing page loads, API proxy works, golden path functions
-
-### What Needs to Change
-
-- `Code/frontend/vercel.json` — Update rewrite destination from `localhost:8000` to production backend URL
-- Vercel project env var: `API_URL=https://<backend-host>/`
-- Backend CORS: Add Vercel production domain to allowed origins in `Code/api/main.py`
-
----
-
-## Risk Register
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Backend cold starts during demo | High (free tier) | Medium | Pre-warm before presenting; add loading states |
-| SQLite concurrency under load | Low (single user) | Low | Acceptable for capstone |
-| Vercel build fails (Next.js 16 edge cases) | Low | Medium | Build locally first, fix before deploying |
-| Landing page too long/overwhelming | Medium | Low | User review checkpoint catches this |
-| API URL misconfigured in production | Medium | High | Smoke test every endpoint after deploy |
-
----
-
-## Estimated Effort
-
-| Phase | Tasks | Est. Time |
-|-------|-------|-----------|
-| A: Landing Page | 3 tasks | 1–2 hours |
-| B: UI/UX Audit + Fixes | 4 tasks | 1–2 hours |
-| C: Vercel Deployment | 5 tasks | 1–2 hours |
-| **Total** | **12 tasks** | **3–6 hours** |
+After Batch 4: **USER REVIEW CHECKPOINT** — present all fixes for approval before Vercel deployment.

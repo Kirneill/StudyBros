@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Spinner } from "@/components/ui";
+import { ErrorState, Spinner } from "@/components/ui";
 import { TopicComplete } from "@/components/gamification";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
@@ -11,7 +11,8 @@ export default function StudySetCompletePage() {
   const params = useParams();
   const id = Number(params.id);
 
-  const { data: studySet, loading } = useApi(
+  /* C1: Wire up error + refetch */
+  const { data: studySet, loading, error, refetch } = useApi(
     useCallback(() => api.getStudySet(id), [id]),
   );
 
@@ -20,6 +21,16 @@ export default function StudySetCompletePage() {
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load study set"
+        description={error}
+        onRetry={refetch}
+      />
     );
   }
 

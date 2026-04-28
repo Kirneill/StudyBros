@@ -124,11 +124,17 @@ export interface Phase {
   avg_accuracy_30d: number;
 }
 
+export interface CalibrationData {
+  avg_confidence: number;
+  avg_accuracy: number;
+  calibration_score: number;
+}
+
 export interface StrengthsWeaknesses {
   strengths: Record<string, unknown>[];
   weaknesses: Record<string, unknown>[];
   recommendations: Record<string, unknown>[];
-  calibration: Record<string, unknown>;
+  calibration: CalibrationData;
 }
 
 export interface ScheduleCard {

@@ -16,14 +16,25 @@ export function PhaseIndicator({ phase }: PhaseIndicatorProps) {
     <div className="flex items-center gap-4 p-4 rounded-xl bg-bg-card border border-border">
       {/* Phase circles */}
       <div className="flex gap-1.5">
-        {[1, 2, 3].map((p) => (
-          <div
-            key={p}
-            className={`w-3 h-3 rounded-full transition-colors ${
-              p <= phase.phase ? "bg-accent" : "bg-bg-input"
-            }`}
-          />
-        ))}
+        {[1, 2, 3].map((p) => {
+          const completed = p < phase.phase;
+          const active = p === phase.phase;
+          const status = completed
+            ? "completed"
+            : active
+              ? "current"
+              : "upcoming";
+          return (
+            <div
+              key={p}
+              aria-label={`Phase ${p}: ${PHASE_NAMES[p] ?? `Phase ${p}`}, ${status}`}
+              aria-current={active ? "step" : undefined}
+              className={`w-3 h-3 rounded-full transition-colors ${
+                p <= phase.phase ? "bg-accent" : "bg-bg-input"
+              }`}
+            />
+          );
+        })}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-text-primary">

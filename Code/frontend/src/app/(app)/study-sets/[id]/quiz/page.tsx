@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Button, Card, Badge, ProgressBar, Spinner } from "@/components/ui";
+import { Button, Card, Badge, ErrorState, ProgressBar, Spinner } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import type { QuizQuestion } from "@/lib/types";
@@ -61,24 +61,84 @@ function getOptionStyle(
   return "border-border opacity-50";
 }
 
+interface PersistedQuizState {
+  results: boolean[];
+  currentIndex: number;
+}
+
 export default function QuizPage() {
   const params = useParams();
   const studySetId = Number(params.id);
 
-  const { data: studySet, loading } = useApi(
+  /* C1: Wire up error + refetch */
+  const { data: studySet, loading, error, refetch } = useApi(
     useCallback(() => api.getStudySet(studySetId), [studySetId]),
   );
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  /* M20: Restore quiz state from sessionStorage via lazy initializers */
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(`quiz-${studySetId}`);
+      if (saved) {
+        const parsed: PersistedQuizState = JSON.parse(saved);
+        if (typeof parsed.currentIndex === "number" && parsed.currentIndex >= 0)
+          return parsed.currentIndex;
+      }
+    } catch { /* ignore corrupt data */ }
+    return 0;
+  });
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
-  const [results, setResults] = useState<boolean[]>([]);
+  const [results, setResults] = useState<boolean[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(`quiz-${studySetId}`);
+      if (saved) {
+        const parsed: PersistedQuizState = JSON.parse(saved);
+        if (Array.isArray(parsed.results) && parsed.results.length > 0)
+          return parsed.results;
+      }
+    } catch { /* ignore corrupt data */ }
+    return [];
+  });
   const [quizDone, setQuizDone] = useState(false);
 
-  const questions = studySet ? parseQuizQuestions(studySet.content) : [];
-  const currentQ = questions[currentIndex];
+  const questions = useMemo(
+    () => (studySet ? parseQuizQuestions(studySet.content) : []),
+    [studySet],
+  );
   const totalQuestions = questions.length;
+  const currentQ = questions[currentIndex];
   const correctCount = results.filter(Boolean).length;
+
+  /* C19: Focus management on question transition */
+  const questionRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    questionRef.current?.focus();
+  }, [currentIndex]);
+
+  /* M20: Persist quiz state to sessionStorage on each answer */
+  useEffect(() => {
+    if (results.length > 0 && !quizDone) {
+      sessionStorage.setItem(
+        `quiz-${studySetId}`,
+        JSON.stringify({ results, currentIndex }),
+      );
+    }
+    if (quizDone) {
+      sessionStorage.removeItem(`quiz-${studySetId}`);
+    }
+  }, [results, currentIndex, studySetId, quizDone]);
+
+  /* M19: Mid-quiz back navigation warning */
+  useEffect(() => {
+    if (results.length > 0 && !quizDone) {
+      const handler = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+      };
+      window.addEventListener("beforeunload", handler);
+      return () => window.removeEventListener("beforeunload", handler);
+    }
+  }, [results.length, quizDone]);
 
   const handleAnswer = (index: number) => {
     if (answered) return;
@@ -103,6 +163,7 @@ export default function QuizPage() {
     setAnswered(false);
     setResults([]);
     setQuizDone(false);
+    sessionStorage.removeItem(`quiz-${studySetId}`);
   };
 
   if (loading) {
@@ -110,6 +171,17 @@ export default function QuizPage() {
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  /* C1: Show ErrorState on fetch failure */
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load quiz"
+        description={error}
+        onRetry={refetch}
+      />
     );
   }
 
@@ -157,6 +229,7 @@ export default function QuizPage() {
           <p className="text-sm text-text-muted mt-2">{getScoreMessage(pct)}</p>
         </motion.div>
 
+        {/* H18: Results review with accessible ✓/✗ */}
         <div className="space-y-3 mb-8">
           <h2 className="text-sm font-semibold text-text-muted">Review</h2>
           {questions.map((q, i) => (
@@ -164,8 +237,9 @@ export default function QuizPage() {
               <div className="flex items-start gap-3">
                 <span
                   className={`text-lg ${results[i] ? "text-success" : "text-error"}`}
+                  aria-label={results[i] ? "Correct" : "Incorrect"}
                 >
-                  {results[i] ? "✓" : "✗"}
+                  <span aria-hidden="true">{results[i] ? "✓" : "✗"}</span>
                 </span>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{q.question}</p>
@@ -216,11 +290,14 @@ export default function QuizPage() {
         showValue
       />
 
+      {/* C19: Focusable question container */}
       <motion.div
         key={currentIndex}
         initial={{ opacity: 0, x: 30 }}
         animate={{ opacity: 1, x: 0 }}
-        className="mt-6"
+        className="mt-6 outline-none"
+        ref={questionRef}
+        tabIndex={-1}
       >
         <Card>
           {currentQ.bloom_level !== undefined && (
@@ -238,21 +315,48 @@ export default function QuizPage() {
                 selectedAnswer,
                 currentQ.correct_answer,
               );
+              const isCorrect = i === currentQ.correct_answer;
+              const isSelected = i === selectedAnswer;
+
+              /* C17: Text/icon indicators beyond color */
+              let indicator = "";
+              if (answered) {
+                if (isCorrect) indicator = "✓ ";
+                else if (isSelected) indicator = "✗ ";
+              }
+
+              /* C17: aria-label with answer context */
+              let label = opt;
+              if (answered) {
+                if (isCorrect) label = `${opt} — Correct answer`;
+                else if (isSelected) label = `${opt} — Your answer, incorrect`;
+              }
+
               return (
                 <button
                   key={i}
                   onClick={() => handleAnswer(i)}
                   disabled={answered}
+                  aria-label={label}
                   className={`w-full text-left p-4 rounded-lg border transition-colors ${style}`}
                 >
                   <span className="font-medium mr-2">
                     {String.fromCharCode(65 + i)}.
                   </span>
-                  {opt}
+                  {indicator}{opt}
                 </button>
               );
             })}
           </div>
+
+          {/* C5: Screen reader announcement for answer feedback */}
+          {answered && (
+            <div aria-live="assertive" className="sr-only">
+              {selectedAnswer === currentQ.correct_answer
+                ? "Correct!"
+                : `Incorrect. The correct answer is: ${currentQ.options[currentQ.correct_answer]}`}
+            </div>
+          )}
 
           {answered && currentQ.explanation && (
             <motion.div

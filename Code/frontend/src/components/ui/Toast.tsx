@@ -33,14 +33,28 @@ export function Toast({ message, type = "info", duration = 4000, onDismiss }: To
     return () => clearTimeout(timer);
   }, [duration]);
 
+  const handleDismiss = () => {
+    setVisible(false);
+    setTimeout(() => onDismissRef.current(), 300);
+  };
+
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg border text-sm font-medium transition-all duration-300 ${
+      className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all duration-300 ${
         typeStyles[type]
       } ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}
       role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
     >
       {message}
+      <button
+        onClick={handleDismiss}
+        className="ml-2 p-1 opacity-70 hover:opacity-100 transition-opacity"
+        aria-label="Dismiss notification"
+      >
+        &#x2715;
+      </button>
     </div>
   );
 }

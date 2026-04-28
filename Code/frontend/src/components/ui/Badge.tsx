@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
+
 type BadgeVariant = "default" | "accent" | "success" | "warning" | "error" | "bloom";
 
 interface BadgeProps {
   variant?: BadgeVariant;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }
 

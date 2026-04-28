@@ -3,6 +3,7 @@ export { Card, CardHeader, CardTitle } from "./Card";
 export { Badge } from "./Badge";
 export { Spinner } from "./Spinner";
 export { EmptyState } from "./EmptyState";
+export { ErrorState } from "./ErrorState";
 export { ProgressBar } from "./ProgressBar";
 export { Modal } from "./Modal";
 export { Toast } from "./Toast";

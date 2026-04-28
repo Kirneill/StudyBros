@@ -1,6 +1,7 @@
 interface ProgressBarProps {
   value: number;
   max?: number;
+  /** CSS color value — prefer a CSS custom property from the design token system (e.g. "var(--color-accent)"). */
   color?: string;
   label?: string;
   showValue?: boolean;

@@ -2,13 +2,13 @@
 
 import { useCallback } from "react";
 import { AnimateIn } from "@/components/AnimateIn";
-import { Spinner, EmptyState } from "@/components/ui";
+import { Spinner, EmptyState, ErrorState } from "@/components/ui";
 import { AchievementBadge } from "@/components/gamification";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 
 export default function AchievementsPage() {
-  const { data: achievements, loading } = useApi(useCallback(() => api.getAchievements(), []));
+  const { data: achievements, error, loading, refetch } = useApi(useCallback(() => api.getAchievements(), []));
 
   if (loading) {
     return (
@@ -16,6 +16,10 @@ export default function AchievementsPage() {
         <Spinner size="lg" />
       </div>
     );
+  }
+
+  if (error) {
+    return <ErrorState title="Failed to load achievements" description={error} onRetry={refetch} />;
   }
 
   return (

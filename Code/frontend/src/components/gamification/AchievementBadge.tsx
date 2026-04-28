@@ -14,7 +14,10 @@ export function AchievementBadge({ achievement, compact }: AchievementBadgeProps
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-card border border-border">
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-card border border-border"
+        aria-label={`${achievement.title}: ${achievement.description}`}
+      >
         <span className="text-lg" aria-hidden="true">
           🏆
         </span>

@@ -28,7 +28,14 @@ export function DifficultyMeter({ accuracy, target = 0.85 }: DifficultyMeterProp
         </span>
       </div>
       {/* Zone bar */}
-      <div className="relative h-6 rounded-full bg-bg-input overflow-hidden">
+      <div
+        role="meter"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Difficulty level"
+        className="relative h-6 rounded-full bg-bg-input overflow-hidden"
+      >
         {/* Optimal zone highlight */}
         <div className="absolute left-[80%] w-[10%] h-full bg-success/10 border-l border-r border-success/30" />
         {/* Pointer */}

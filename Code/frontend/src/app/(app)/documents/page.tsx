@@ -2,14 +2,16 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimateIn } from "@/components/AnimateIn";
-import { Button, Card, Badge, Spinner, EmptyState, Modal, Toast } from "@/components/ui";
+import { Button, Card, Badge, Spinner, EmptyState, ErrorState, Modal, Toast } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
 
 export default function DocumentsPage() {
-  const { data: docs, loading, refetch } = useApi(useCallback(() => api.listDocuments(), []));
+  const router = useRouter();
+  const { data: docs, error, loading, refetch } = useApi(useCallback(() => api.listDocuments(), []));
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [renameTarget, setRenameTarget] = useState<{ id: number; title: string } | null>(null);
   const [pendingTitle, setPendingTitle] = useState("");
@@ -108,6 +110,16 @@ export default function DocumentsPage() {
     );
   }
 
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load documents"
+        description={error}
+        onRetry={refetch}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
@@ -128,17 +140,19 @@ export default function DocumentsPage() {
             Delete Selected
           </Button>
           {selectedIds.length > 0 && (
-            <Link href={`/documents/${selectedIds[0]}/generate`}>
-              <span className="inline-flex items-center px-4 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10 transition-colors">
-                Generate Study Materials
-              </span>
-            </Link>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/documents/${selectedIds[0]}/generate`)}
+              title={selectedIds.length > 1 ? `Generates for "${documents.find((d) => d.id === selectedIds[0])?.title || "first selected"}" only` : undefined}
+            >
+              {selectedIds.length > 1
+                ? `Generate (${documents.find((d) => d.id === selectedIds[0])?.title || "first selected"})`
+                : "Generate Study Materials"}
+            </Button>
           )}
-          <Link href="/upload">
-            <span className="inline-flex items-center px-4 py-2 rounded-lg bg-accent text-bg-primary text-sm font-medium hover:bg-accent-hover transition-colors">
-              Upload New
-            </span>
-          </Link>
+          <Button onClick={() => router.push("/upload")}>
+            Upload New
+          </Button>
         </div>
       </div>
 
@@ -166,7 +180,8 @@ export default function DocumentsPage() {
                         onChange={() => toggleSelected(doc.id)}
                         className="accent-accent"
                       />
-                      Select
+                      <span className="sr-only">Select {doc.title || "Untitled document"}</span>
+                      <span aria-hidden="true">Select</span>
                     </label>
                     <Button
                       variant="ghost"
@@ -197,6 +212,7 @@ export default function DocumentsPage() {
         open={renameTarget !== null}
         onClose={() => !saving && setRenameTarget(null)}
         title="Rename Document"
+        preventClose={saving}
       >
         <form onSubmit={(e) => { e.preventDefault(); handleRename(); }} className="space-y-4">
           <div>
@@ -227,6 +243,7 @@ export default function DocumentsPage() {
         open={bulkDeleteOpen}
         onClose={() => !saving && setBulkDeleteOpen(false)}
         title="Delete Selected Documents"
+        preventClose={saving}
       >
         <div className="space-y-4">
           <p className="text-text-secondary">

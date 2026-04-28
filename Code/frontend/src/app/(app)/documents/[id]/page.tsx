@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, Button, Badge, Spinner, Modal, Toast } from "@/components/ui";
+import { Card, CardHeader, CardTitle, Button, Badge, Spinner, ErrorState, Modal, Toast } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
@@ -16,8 +16,8 @@ export default function DocumentDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const { data: doc, loading } = useApi(useCallback(() => api.getDocument(id), [id]));
-  const { data: chunks } = useApi(useCallback(() => api.getDocumentChunks(id), [id]));
+  const { data: doc, error: docError, loading, refetch: refetchDoc } = useApi(useCallback(() => api.getDocument(id), [id]));
+  const { data: chunks, error: chunksError, refetch: refetchChunks } = useApi(useCallback(() => api.getDocumentChunks(id), [id]));
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -35,6 +35,16 @@ export default function DocumentDetailPage() {
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Spinner size="lg" /></div>;
+  }
+
+  if (docError) {
+    return (
+      <ErrorState
+        title="Failed to load document"
+        description={docError}
+        onRetry={refetchDoc}
+      />
+    );
   }
 
   if (!doc) {
@@ -62,12 +72,26 @@ export default function DocumentDetailPage() {
       </div>
 
       {/* Chunks */}
-      {chunks && chunks.length > 0 && (
+      {chunksError ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Content Chunks</CardTitle>
+          </CardHeader>
+          <div className="p-4 text-center">
+            <p className="text-sm text-error mb-3">Failed to load chunks: {chunksError}</p>
+            <Button variant="outline" size="sm" onClick={refetchChunks}>Try Again</Button>
+          </div>
+        </Card>
+      ) : chunks && chunks.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Content Chunks ({chunks.length})</CardTitle>
           </CardHeader>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div
+            className="space-y-3 max-h-96 overflow-y-auto"
+            tabIndex={0}
+            aria-label="Document chunks"
+          >
             {chunks.map((c) => (
               <div key={c.chunk_index} className="p-3 rounded-lg bg-bg-input border border-border">
                 <div className="flex items-center justify-between mb-2">
@@ -79,7 +103,7 @@ export default function DocumentDetailPage() {
             ))}
           </div>
         </Card>
-      )}
+      ) : null}
 
       <Modal open={showDelete} onClose={() => setShowDelete(false)} title="Delete Document">
         <p className="text-text-secondary mb-4">This will permanently delete this document and all associated data.</p>

@@ -8,16 +8,24 @@ interface ConsistencyStreakProps {
   studiedDates: string[];
 }
 
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function ConsistencyStreak({
   streakDays,
   consistencyPct,
   studiedDates,
 }: ConsistencyStreakProps) {
   const today = new Date();
+  const todayStr = formatLocalDate(today);
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
     d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split("T")[0];
+    return formatLocalDate(d);
   });
 
   const studiedSet = new Set(studiedDates);
@@ -34,7 +42,11 @@ export function ConsistencyStreak({
       <div className="flex gap-1.5">
         {last7.map((date) => {
           const studied = studiedSet.has(date);
-          const isToday = date === today.toISOString().split("T")[0];
+          const isToday = date === todayStr;
+          const displayDate = new Date(date + "T12:00:00").toLocaleDateString(
+            "en",
+            { month: "long", day: "numeric" },
+          );
           return (
             <motion.div
               key={date}
@@ -46,6 +58,7 @@ export function ConsistencyStreak({
                   : "bg-bg-input text-text-muted border border-border"
               } ${isToday ? "ring-1 ring-accent" : ""}`}
               title={date}
+              aria-label={`${displayDate}: ${studied ? "studied" : "not studied"}`}
             >
               {new Date(date + "T12:00:00").toLocaleDateString("en", {
                 weekday: "narrow",

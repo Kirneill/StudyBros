@@ -1,11 +1,13 @@
+import type { CalibrationData } from "@/lib/types";
+
 interface CalibrationChartProps {
-  calibration: Record<string, unknown>;
+  calibration: CalibrationData;
 }
 
 export function CalibrationChart({ calibration }: CalibrationChartProps) {
-  const avgConfidence = Number(calibration.avg_confidence ?? 0);
-  const avgAccuracy = Number(calibration.avg_accuracy ?? 0);
-  const score = Number(calibration.calibration_score ?? 0);
+  const avgConfidence = calibration.avg_confidence;
+  const avgAccuracy = calibration.avg_accuracy;
+  const score = calibration.calibration_score;
 
   const isOverconfident = avgConfidence > avgAccuracy + 10;
   const isUnderconfident = avgConfidence < avgAccuracy - 10;
@@ -13,13 +15,19 @@ export function CalibrationChart({ calibration }: CalibrationChartProps) {
   return (
     <div className="space-y-4">
       <div className="flex gap-4">
-        <div className="flex-1 p-4 rounded-lg bg-bg-card border border-border text-center">
+        <div
+          className="flex-1 p-4 rounded-lg bg-bg-card border border-border text-center"
+          aria-label={`Average confidence: ${Math.round(avgConfidence)}%`}
+        >
           <span className="text-2xl font-bold font-mono text-info">
             {Math.round(avgConfidence)}%
           </span>
           <p className="text-xs text-text-muted mt-1">Avg Confidence</p>
         </div>
-        <div className="flex-1 p-4 rounded-lg bg-bg-card border border-border text-center">
+        <div
+          className="flex-1 p-4 rounded-lg bg-bg-card border border-border text-center"
+          aria-label={`Average accuracy: ${Math.round(avgAccuracy)}%`}
+        >
           <span className="text-2xl font-bold font-mono text-accent">
             {Math.round(avgAccuracy)}%
           </span>
@@ -35,7 +43,10 @@ export function CalibrationChart({ calibration }: CalibrationChartProps) {
           !isUnderconfident &&
           "Your confidence is well-calibrated with your actual performance."}
       </div>
-      <p className="text-xs text-text-muted">
+      <p
+        className="text-xs text-text-muted"
+        aria-label={`Calibration score: ${score.toFixed(2)}`}
+      >
         Calibration score: {score.toFixed(2)}
       </p>
     </div>

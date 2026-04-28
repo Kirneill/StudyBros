@@ -1,12 +1,30 @@
 import type { StrengthsWeaknesses } from "@/lib/types";
 
+type HeadingLevel = "h2" | "h3" | "h4";
+
 interface SessionReportProps {
   data: StrengthsWeaknesses;
   accuracy?: number;
   totalCards?: number;
+  headingLevel?: HeadingLevel;
 }
 
-export function SessionReport({ data, accuracy, totalCards }: SessionReportProps) {
+function getDisplayText(item: Record<string, unknown>): string | null {
+  const text = item.topic ?? item.description ?? item.action ?? item.name;
+  if (typeof text === "string" && text.length > 0) return text;
+  return null;
+}
+
+export function SessionReport({
+  data,
+  accuracy,
+  totalCards,
+  headingLevel: Heading = "h3",
+}: SessionReportProps) {
+  const displayedStrengths = data.strengths.filter((s) => getDisplayText(s) !== null);
+  const displayedWeaknesses = data.weaknesses.filter((w) => getDisplayText(w) !== null);
+  const displayedRecommendations = data.recommendations.filter((r) => getDisplayText(r) !== null);
+
   return (
     <div className="space-y-6">
       {/* Session stats */}
@@ -40,18 +58,18 @@ export function SessionReport({ data, accuracy, totalCards }: SessionReportProps
       )}
 
       {/* Strengths */}
-      {data.strengths.length > 0 && (
+      {displayedStrengths.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-success mb-3">
+          <Heading className="text-sm font-semibold text-success mb-3">
             Strengths
-          </h3>
+          </Heading>
           <div className="space-y-2">
-            {data.strengths.map((s, i) => (
+            {displayedStrengths.map((s, i) => (
               <div
                 key={i}
                 className="px-4 py-3 rounded-lg bg-success/5 border border-success/10 text-sm text-text-secondary"
               >
-                {String(s.topic ?? s.description ?? JSON.stringify(s))}
+                {getDisplayText(s)}
               </div>
             ))}
           </div>
@@ -59,18 +77,18 @@ export function SessionReport({ data, accuracy, totalCards }: SessionReportProps
       )}
 
       {/* Weaknesses */}
-      {data.weaknesses.length > 0 && (
+      {displayedWeaknesses.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-warning mb-3">
+          <Heading className="text-sm font-semibold text-warning mb-3">
             Areas to improve
-          </h3>
+          </Heading>
           <div className="space-y-2">
-            {data.weaknesses.map((w, i) => (
+            {displayedWeaknesses.map((w, i) => (
               <div
                 key={i}
                 className="px-4 py-3 rounded-lg bg-warning/5 border border-warning/10 text-sm text-text-secondary"
               >
-                {String(w.topic ?? w.description ?? JSON.stringify(w))}
+                {getDisplayText(w)}
               </div>
             ))}
           </div>
@@ -78,18 +96,18 @@ export function SessionReport({ data, accuracy, totalCards }: SessionReportProps
       )}
 
       {/* Recommendations */}
-      {data.recommendations.length > 0 && (
+      {displayedRecommendations.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-accent mb-3">
+          <Heading className="text-sm font-semibold text-accent mb-3">
             Recommendations
-          </h3>
+          </Heading>
           <div className="space-y-2">
-            {data.recommendations.map((r, i) => (
+            {displayedRecommendations.map((r, i) => (
               <div
                 key={i}
                 className="px-4 py-3 rounded-lg bg-accent-light border border-accent/10 text-sm text-text-secondary"
               >
-                {String(r.action ?? r.description ?? JSON.stringify(r))}
+                {getDisplayText(r)}
               </div>
             ))}
           </div>

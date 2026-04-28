@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import type { ScheduleCard } from "@/lib/types";
 
 interface ForgettingCurveProps {
@@ -5,8 +8,10 @@ interface ForgettingCurveProps {
 }
 
 export function ForgettingCurve({ cards }: ForgettingCurveProps) {
-  const sorted = [...cards].sort((a, b) => a.retrievability - b.retrievability);
-  const displayed = sorted.slice(0, 20);
+  const displayed = useMemo(
+    () => [...cards].sort((a, b) => a.retrievability - b.retrievability).slice(0, 20),
+    [cards],
+  );
 
   return (
     <div className="space-y-1.5">
@@ -25,6 +30,11 @@ export function ForgettingCurve({ cards }: ForgettingCurveProps) {
             </span>
             <div className="flex-1 h-4 rounded bg-bg-input overflow-hidden">
               <div
+                role="progressbar"
+                aria-valuenow={pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Card ${card.card_id}: ${pct}% retention`}
                 className="h-full rounded transition-all duration-500"
                 style={{ width: `${pct}%`, backgroundColor: color }}
               />

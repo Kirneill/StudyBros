@@ -24,7 +24,7 @@ export default function LandingPage() {
     <div className="min-h-screen flex flex-col">
       <LandingNav />
 
-      <main>
+      <main id="main-content">
       {/* ── 1. Hero ── */}
       <section className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
         <div className="max-w-3xl mx-auto text-center">
@@ -53,7 +53,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/upload"
-                className="inline-flex items-center px-8 py-4 rounded-xl bg-accent text-bg-primary font-semibold text-lg hover:bg-accent-hover transition-colors shadow-[0_0_24px_rgba(0,212,170,0.3)]"
+                className="inline-flex items-center px-8 py-4 rounded-xl bg-accent text-bg-primary font-semibold text-lg hover:bg-accent-hover transition-colors shadow-[var(--shadow-accent-glow)]"
               >
                 Start Studying — Free
               </Link>
@@ -135,6 +135,22 @@ export default function LandingPage() {
                 <line x1="460" y1="16" x2="490" y2="16" stroke="#00D4AA" strokeWidth="2.5" strokeDasharray="8 4" />
                 <text x="496" y="20" fill="#B8B4AF" fontSize="12">With spaced repetition</text>
               </svg>
+              <table className="sr-only">
+                <caption>Forgetting curve data</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Day</th>
+                    <th scope="col">Without review</th>
+                    <th scope="col">With spaced repetition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Day 1</td><td>100%</td><td>100%</td></tr>
+                  <tr><td>Day 2</td><td>50%</td><td>95%</td></tr>
+                  <tr><td>Day 7</td><td>35%</td><td>90%</td></tr>
+                  <tr><td>Day 30</td><td>20%</td><td>85%</td></tr>
+                </tbody>
+              </table>
               <p className="text-text-muted text-sm text-center mt-4">
                 Spaced repetition flattens the curve. Each review strengthens the memory trace.
               </p>
@@ -321,9 +337,9 @@ export default function LandingPage() {
                       {Object.keys(comparisonData).map((tool, colIdx) => (
                         <td key={tool} className={`text-center px-4 py-3${colIdx === Object.keys(comparisonData).length - 1 ? " rounded-r-lg" : ""}`}>
                           {comparisonData[tool][rowIdx] ? (
-                            <span className="text-accent font-bold" aria-label="Supported">&#10003;</span>
+                            <span className="text-accent font-bold" aria-label="Yes">&#10003;<span className="sr-only"> Yes</span></span>
                           ) : (
-                            <span className="text-text-muted" aria-label="Not supported">&#10005;</span>
+                            <span className="text-text-muted" aria-label="No">&mdash;</span>
                           )}
                         </td>
                       ))}
@@ -352,21 +368,24 @@ export default function LandingPage() {
                 quote:
                   "Spaced practice produces a 200% improvement in long-term retention compared to massed practice.",
                 cite: "Cepeda et al., 2006",
+                citeUrl: "https://doi.org/10.1111/j.1467-9280.2006.01693.x",
               },
               {
                 quote:
                   "Students who generated their own study materials scored 22% higher than those who passively reviewed.",
                 cite: "Fiorella & Mayer, 2016",
+                citeUrl: "https://doi.org/10.1007/s10648-015-9338-z",
               },
               {
                 quote:
                   "The optimal error rate for learning is approximately 15.87% — roughly the 85% accuracy rule.",
                 cite: "Wilson et al., 2019",
+                citeUrl: "https://doi.org/10.1038/s41467-019-12552-4",
               },
             ].map((item, i) => (
               <AnimateIn key={item.cite} delay={i * 0.1}>
                 <Card className="h-full flex flex-col justify-between">
-                  <blockquote className="text-text-secondary italic mb-4 leading-relaxed">
+                  <blockquote cite={item.citeUrl} className="text-text-secondary italic mb-4 leading-relaxed">
                     &ldquo;{item.quote}&rdquo;
                   </blockquote>
                   <cite className="text-text-muted text-sm not-italic block">
@@ -395,7 +414,7 @@ export default function LandingPage() {
           <AnimateIn delay={0.15}>
             <Link
               href="/upload"
-              className="inline-flex items-center px-10 py-4 rounded-xl bg-accent text-bg-primary font-semibold text-lg hover:bg-accent-hover transition-colors shadow-[0_0_24px_rgba(0,212,170,0.3)]"
+              className="inline-flex items-center px-10 py-4 rounded-xl bg-accent text-bg-primary font-semibold text-lg hover:bg-accent-hover transition-colors shadow-[var(--shadow-accent-glow)]"
             >
               Upload Your Material
             </Link>

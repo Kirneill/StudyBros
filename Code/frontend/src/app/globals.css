@@ -38,6 +38,9 @@
   --color-error: #F87171;
   --color-info: #60A5FA;
 
+  /* Shadows */
+  --shadow-accent-glow: 0 0 24px rgba(0, 212, 170, 0.3);
+
   /* Borders */
   --color-border: rgba(245, 240, 235, 0.08);
   --color-border-active: rgba(0, 212, 170, 0.3);

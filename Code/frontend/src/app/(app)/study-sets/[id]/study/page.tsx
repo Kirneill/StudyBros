@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button, Card, ProgressBar, Spinner, Badge } from "@/components/ui";
+import { Button, Card, ErrorState, ProgressBar, Spinner, Badge } from "@/components/ui";
 import { DifficultyMeter, SessionReport } from "@/components/gamification";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
@@ -42,7 +42,7 @@ export default function StudyPage() {
   const params = useParams<{ id: string }>();
   const studySetId = Number(params.id);
 
-  const { data: studySet, loading: loadingSet } = useApi(
+  const { data: studySet, loading: loadingSet, error: fetchError, refetch } = useApi(
     useCallback(() => api.getStudySet(studySetId), [studySetId])
   );
 
@@ -54,8 +54,10 @@ export default function StudyPage() {
   const [lastReview, setLastReview] = useState<ReviewResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [swData, setSwData] = useState<StrengthsWeaknesses | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const cards: CardData[] = (() => {
+  const cards: CardData[] = useMemo(() => {
     if (!studySet) return [];
     const content = getFlashcardItems(studySet.content);
     return content.map((item, i) => {
@@ -68,17 +70,20 @@ export default function StudyPage() {
           typeof obj.bloom_level === "number" ? obj.bloom_level : undefined,
       };
     });
-  })();
+  }, [studySet]);
 
   const currentCard = cards[currentIndex];
   const totalCards = cards.length;
   const goodOrEasy = ratings.filter((r) => r >= 3).length;
   const accuracy = ratings.length > 0 ? goodOrEasy / ratings.length : 0;
 
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
   const handleRate = useCallback(
     async (rating: 1 | 2 | 3 | 4, confidence: number) => {
       if (!currentCard || submitting) return;
       setSubmitting(true);
+      setReviewError(null);
       try {
         const response = await api.recordReview(studySetId, {
           card_index: currentCard.index,
@@ -91,7 +96,7 @@ export default function StudyPage() {
         setRatings(nextRatings);
         setConfidenceRatings(nextConfidenceRatings);
 
-        setTimeout(() => {
+        timerRef.current = setTimeout(() => {
           const finalizeReview = async () => {
             setLastReview(null);
             setRevealed(false);
@@ -129,10 +134,9 @@ export default function StudyPage() {
         }, 1200);
       } catch (err) {
         setSubmitting(false);
-        console.error(
-          "Review failed:",
-          err instanceof ApiError ? err.detail : err
-        );
+        const message = err instanceof ApiError ? err.detail : "Failed to save review. Please try again.";
+        setReviewError(message);
+        console.error("Review failed:", err);
       }
     },
     [cards, confidenceRatings, currentCard, currentIndex, ratings, studySetId, submitting, totalCards]
@@ -143,6 +147,16 @@ export default function StudyPage() {
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <ErrorState
+        title="Failed to load study set"
+        description={fetchError}
+        onRetry={refetch}
+      />
     );
   }
 
@@ -272,17 +286,19 @@ export default function StudyPage() {
               </p>
             </div>
 
-            {revealed && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="border-t border-border pt-4 mt-4"
-              >
-                <p className="text-text-secondary text-center">
-                  {currentCard.back}
-                </p>
-              </motion.div>
-            )}
+            <div aria-live="polite" aria-atomic="true">
+              {revealed && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="border-t border-border pt-4 mt-4"
+                >
+                  <p className="text-text-secondary text-center">
+                    {currentCard.back}
+                  </p>
+                </motion.div>
+              )}
+            </div>
 
             {!revealed && (
               <div className="mt-auto pt-4">
@@ -313,6 +329,19 @@ export default function StudyPage() {
           {revealed && !lastReview && (
             <RatingPanel onRate={handleRate} disabled={submitting} />
           )}
+
+          {reviewError && (
+            <div role="alert" className="mt-3 p-3 rounded-lg bg-error/10 text-error text-sm text-center">
+              <p>{reviewError}</p>
+              <button
+                type="button"
+                onClick={() => setReviewError(null)}
+                className="mt-2 underline text-xs focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 
@@ -336,6 +365,11 @@ function RatingPanel({
   const [selectedRating, setSelectedRating] = useState<
     1 | 2 | 3 | 4 | null
   >(null);
+  const firstRatingRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    firstRatingRef.current?.focus();
+  }, []);
 
   const handleRatingClick = (rating: 1 | 2 | 3 | 4) => {
     setSelectedRating(rating);
@@ -355,12 +389,15 @@ function RatingPanel({
           How well did you know this?
         </p>
         <div className="grid grid-cols-4 gap-2">
-          {FSRS_RATINGS.map((r) => (
+          {FSRS_RATINGS.map((r, i) => (
             <button
               key={r.value}
+              ref={i === 0 ? firstRatingRef : undefined}
+              type="button"
               onClick={() => handleRatingClick(r.value)}
               disabled={disabled || showConfidence}
-              className={`p-3 rounded-lg border text-center transition-colors disabled:opacity-50 ${
+              aria-pressed={selectedRating === r.value}
+              className={`p-3 rounded-lg border text-center transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${
                 selectedRating === r.value
                   ? "border-accent bg-accent/10"
                   : "border-border hover:bg-bg-card-hover"
@@ -392,9 +429,10 @@ function RatingPanel({
             {[1, 2, 3, 4, 5].map((c) => (
               <button
                 key={c}
+                type="button"
                 onClick={() => handleConfidenceClick(c)}
                 disabled={disabled}
-                className="w-10 h-10 rounded-lg border border-border text-sm font-medium transition-colors hover:bg-bg-card-hover text-text-secondary disabled:opacity-50"
+                className="w-11 h-11 rounded-lg border border-border text-sm font-medium transition-colors hover:bg-bg-card-hover text-text-secondary disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
               >
                 {c}
               </button>

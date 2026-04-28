@@ -25,6 +25,8 @@ const ACCEPTED_FILE_TYPES = [
   ".ogg",
 ].join(",");
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
 export default function UploadPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +50,10 @@ export default function UploadPage() {
 
     try {
       for (const [index, file] of files.entries()) {
+        if (file.size > MAX_FILE_SIZE) {
+          failedUploads.push(`${file.name} exceeds 50 MB limit (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+          continue;
+        }
         setUploadStatus(`Uploading ${index + 1} of ${files.length}: ${file.name}`);
         try {
           const doc = await api.uploadFile(file);
@@ -122,11 +128,23 @@ export default function UploadPage() {
         }`}
       >
         <div
-          className="flex flex-col items-center justify-center py-16"
+          role="button"
+          tabIndex={0}
+          aria-label="Drop files here or press Enter to choose files"
+          className="flex flex-col items-center justify-center py-16 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
         >
+          <span className="sr-only" aria-live="polite">
+            {dragging ? "Drop files to upload" : ""}
+          </span>
           <span className="text-5xl mb-4">{uploading ? "&#9203;" : "&#128194;"}</span>
           <p className="text-lg font-medium mb-2">
             {uploading ? "Uploading..." : "Drop your files here"}
@@ -134,7 +152,7 @@ export default function UploadPage() {
           <p className="text-text-secondary text-sm mb-6">
             PDF, PPTX, text, audio, or video files up to 50 MB each
           </p>
-          {uploadStatus && <p className="text-sm text-text-muted mb-4">{uploadStatus}</p>}
+          {uploadStatus && <p className="text-sm text-text-muted mb-4" aria-live="polite" aria-atomic="true">{uploadStatus}</p>}
           <input
             ref={inputRef}
             type="file"
@@ -142,6 +160,7 @@ export default function UploadPage() {
             accept={ACCEPTED_FILE_TYPES}
             multiple
             onChange={onFileSelect}
+            aria-label="Upload files"
           />
           <Button
             onClick={() => inputRef.current?.click()}

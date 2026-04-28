@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Button, Card, Badge, Spinner } from "@/components/ui";
+import { Button, Card, Badge, ErrorState, Spinner } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import Link from "next/link";
@@ -57,14 +57,40 @@ export default function PracticeTestPage() {
   const { id } = useParams<{ id: string }>();
   const studySetId = Number(id);
 
-  const { data: studySet, loading } = useApi(
+  /* C1: Wire up error + refetch */
+  const { data: studySet, loading, error, refetch } = useApi(
     useCallback(() => api.getStudySet(studySetId), [studySetId]),
   );
 
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  /* M20: Restore test state from sessionStorage via lazy initializer */
+  const [answers, setAnswers] = useState<Record<number, number>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`test-${studySetId}`);
+      if (saved) {
+        const parsed: Record<string, unknown> = JSON.parse(saved);
+        if (
+          typeof parsed.answers === "object" &&
+          parsed.answers !== null &&
+          !Array.isArray(parsed.answers)
+        ) {
+          const restoredAnswers: Record<number, number> = {};
+          for (const [key, val] of Object.entries(
+            parsed.answers as Record<string, unknown>,
+          )) {
+            if (typeof val === "number") {
+              restoredAnswers[Number(key)] = val;
+            }
+          }
+          if (Object.keys(restoredAnswers).length > 0) return restoredAnswers;
+        }
+      }
+    } catch { /* ignore corrupt data */ }
+    return {};
+  });
   const [submitted, setSubmitted] = useState(false);
 
-  const questions: TestQuestion[] = (() => {
+  /* M21: Memoize questions derivation */
+  const questions: TestQuestion[] = useMemo(() => {
     if (!studySet) return [];
     const content = Array.isArray(studySet.content)
       ? studySet.content
@@ -72,10 +98,34 @@ export default function PracticeTestPage() {
         ? studySet.content.questions
         : [];
     return content.filter(isQuestionRecord).map(parseQuestion);
-  })();
+  }, [studySet]);
 
   const totalQuestions = questions.length;
   const allAnswered = Object.keys(answers).length >= totalQuestions;
+
+  /* M20: Persist test state to sessionStorage on each answer */
+  useEffect(() => {
+    if (Object.keys(answers).length > 0 && !submitted) {
+      sessionStorage.setItem(
+        `test-${studySetId}`,
+        JSON.stringify({ answers }),
+      );
+    }
+    if (submitted) {
+      sessionStorage.removeItem(`test-${studySetId}`);
+    }
+  }, [answers, studySetId, submitted]);
+
+  /* M19: Mid-test navigation warning */
+  useEffect(() => {
+    if (Object.keys(answers).length > 0 && !submitted) {
+      const handler = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+      };
+      window.addEventListener("beforeunload", handler);
+      return () => window.removeEventListener("beforeunload", handler);
+    }
+  }, [answers, submitted]);
 
   const handleSelect = (qIndex: number, optionIndex: number) => {
     if (submitted) return;
@@ -83,6 +133,7 @@ export default function PracticeTestPage() {
   };
 
   const handleSubmit = () => {
+    if (!allAnswered) return;
     setSubmitted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -90,6 +141,7 @@ export default function PracticeTestPage() {
   const handleRetry = () => {
     setAnswers({});
     setSubmitted(false);
+    sessionStorage.removeItem(`test-${studySetId}`);
   };
 
   // Scoring
@@ -117,6 +169,17 @@ export default function PracticeTestPage() {
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  /* C1: Show ErrorState on fetch failure */
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load test"
+        description={error}
+        onRetry={refetch}
+      />
     );
   }
 
@@ -158,13 +221,13 @@ export default function PracticeTestPage() {
         </span>
       </div>
 
-      {/* Score banner (after submit) */}
+      {/* C20: Score banner with aria-live for announcement */}
       {submitted && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="mb-6 p-6">
+          <Card className="mb-6 p-6" aria-live="polite">
             <div className="flex items-center gap-6">
               <div className="text-center">
                 <span
@@ -243,35 +306,61 @@ export default function PracticeTestPage() {
                       </span>
                     )}
                   </div>
-                  <p className="font-medium">{q.question}</p>
+                  {/* H19: fieldset + legend for question semantics */}
+                  <fieldset className="border-0 p-0 m-0">
+                    <legend className="font-medium text-base p-0 mb-0">
+                      {q.question}
+                    </legend>
+                  </fieldset>
                 </div>
               </div>
 
-              <div className="space-y-2 ml-11">
+              {/* H19: radiogroup role for option semantics */}
+              <div className="space-y-2 ml-11" role="radiogroup" aria-label={`Question ${qIdx + 1}: ${q.question}`}>
                 {q.options.map((opt, oIdx) => {
                   let optStyle = "border-border";
+                  const isOptionCorrect = oIdx === q.correctAnswer;
+                  const isOptionSelected = userAnswer === oIdx;
+
                   if (submitted) {
-                    if (oIdx === q.correctAnswer)
+                    if (isOptionCorrect)
                       optStyle = "border-success/50 bg-success/5";
-                    else if (oIdx === userAnswer && oIdx !== q.correctAnswer)
+                    else if (isOptionSelected && !isOptionCorrect)
                       optStyle = "border-error/50 bg-error/5";
-                  } else if (userAnswer === oIdx) {
+                  } else if (isOptionSelected) {
                     optStyle = "border-accent bg-accent/5";
+                  }
+
+                  /* C17: Text/icon indicators beyond color */
+                  let indicator = "";
+                  if (submitted) {
+                    if (isOptionCorrect) indicator = "✓ ";
+                    else if (isOptionSelected) indicator = "✗ ";
+                  }
+
+                  /* C17: aria-label with answer context */
+                  let ariaLabel = opt;
+                  if (submitted) {
+                    if (isOptionCorrect) ariaLabel = `${opt} — Correct answer`;
+                    else if (isOptionSelected) ariaLabel = `${opt} — Your answer, incorrect`;
                   }
 
                   return (
                     <button
                       key={oIdx}
                       onClick={() => handleSelect(qIdx, oIdx)}
-                      disabled={submitted}
+                      /* H19/H20: radio semantics with aria-checked */
+                      role="radio"
+                      aria-checked={isOptionSelected}
+                      aria-label={ariaLabel}
                       className={`w-full text-left p-3 rounded-lg border transition-colors text-sm ${optStyle} ${
-                        !submitted ? "hover:bg-bg-card-hover" : ""
+                        !submitted ? "hover:bg-bg-card-hover cursor-pointer" : ""
                       }`}
                     >
                       <span className="font-medium mr-2">
                         {String.fromCharCode(65 + oIdx)}.
                       </span>
-                      {opt}
+                      {indicator}{opt}
                     </button>
                   );
                 })}
@@ -290,11 +379,12 @@ export default function PracticeTestPage() {
       {/* Submit / Actions */}
       <div className="mt-8 mb-12 flex gap-4 justify-center">
         {!submitted ? (
+          /* C18: aria-disabled instead of disabled for AT visibility */
           <Button
             size="lg"
-            onClick={handleSubmit}
-            disabled={!allAnswered}
-            className="w-full max-w-sm"
+            onClick={allAnswered ? handleSubmit : undefined}
+            aria-disabled={!allAnswered}
+            className={`w-full max-w-sm ${!allAnswered ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             {allAnswered
               ? "Submit Test"

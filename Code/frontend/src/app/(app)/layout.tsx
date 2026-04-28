@@ -19,7 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-bg-secondary border-r border-border">
+      <aside aria-label="Sidebar navigation" className="hidden md:flex w-64 flex-col bg-bg-secondary border-r border-border">
         <div className="p-6">
           <Link href="/" className="text-xl font-bold font-[family-name:var(--font-heading)]">
             <span className="text-accent">Study</span>Bros
@@ -32,13 +32,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   active
                     ? "bg-accent-light text-accent"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-card"
                 }`}
               >
-                <span className="text-lg">{item.icon}</span>
+                <span className="text-lg" aria-hidden="true">{item.icon}</span>
                 {item.label}
               </Link>
             );
@@ -57,11 +58,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1 text-xs ${
+              aria-current={active ? "page" : undefined}
+              className={`flex flex-col items-center gap-0.5 px-2 py-2 min-h-[44px] justify-center text-xs ${
                 active ? "text-accent" : "text-text-muted"
               }`}
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className="text-lg" aria-hidden="true">{item.icon}</span>
               {item.label}
             </Link>
           );
@@ -69,7 +71,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pb-20 md:pb-0">
+      <main id="main-content" className="flex-1 overflow-auto pb-20 md:pb-0">
+        {/* key={pathname} intentionally resets page state on navigation for fresh page transitions */}
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
