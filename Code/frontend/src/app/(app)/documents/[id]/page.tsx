@@ -43,7 +43,8 @@ export default function DocumentDetailPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-8">
+      <Link href="/documents" className="text-sm text-text-muted hover:text-text-primary transition-colors">&larr; Back to Documents</Link>
+      <div className="flex items-start justify-between mb-8 mt-4">
         <div>
           <h1 className="font-[family-name:var(--font-heading)] text-3xl font-bold">{doc.title || "Untitled"}</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-text-muted">
@@ -84,7 +85,7 @@ export default function DocumentDetailPage() {
         <p className="text-text-secondary mb-4">This will permanently delete this document and all associated data.</p>
         <div className="flex gap-3 justify-end">
           <Button variant="ghost" onClick={() => setShowDelete(false)}>Cancel</Button>
-          <Button variant="primary" onClick={handleDelete} loading={deleting} className="!bg-error hover:!bg-error/80">Delete</Button>
+          <Button onClick={handleDelete} loading={deleting} variant="destructive">Delete</Button>
         </div>
       </Modal>
 

@@ -2,7 +2,7 @@
 
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
-type ButtonVariant = "primary" | "secondary" | "outline" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -16,6 +16,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   secondary: "bg-bg-card text-text-primary hover:bg-bg-card-hover border border-border",
   outline: "border border-border text-text-primary hover:bg-bg-card",
   ghost: "text-text-secondary hover:text-text-primary hover:bg-bg-card",
+  destructive: "bg-error text-bg-primary hover:bg-error/80",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -30,6 +31,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 disabled:pointer-events-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        aria-busy={loading || undefined}
         disabled={disabled || loading}
         {...props}
       >

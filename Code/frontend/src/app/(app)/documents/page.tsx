@@ -198,7 +198,7 @@ export default function DocumentsPage() {
         onClose={() => !saving && setRenameTarget(null)}
         title="Rename Document"
       >
-        <div className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleRename(); }} className="space-y-4">
           <div>
             <label htmlFor="document-title" className="text-sm font-medium mb-2 block">
               Document Title
@@ -213,14 +213,14 @@ export default function DocumentsPage() {
             />
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setRenameTarget(null)} disabled={saving}>
+            <Button type="button" variant="ghost" onClick={() => setRenameTarget(null)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={handleRename} loading={saving}>
+            <Button type="submit" loading={saving}>
               Save
             </Button>
           </div>
-        </div>
+        </form>
       </Modal>
 
       <Modal
@@ -239,7 +239,7 @@ export default function DocumentsPage() {
             <Button
               onClick={handleBulkDelete}
               loading={saving}
-              className="!bg-error hover:!bg-error/80"
+              variant="destructive"
             >
               Delete Selected
             </Button>

@@ -308,69 +308,56 @@ Last updated: 2026-04-27
 
 ---
 
-## IN PROGRESS
+### 12. Fix Calibration Chart 10000% Bug + Add Generate Button to Documents Page
+**Status:** DONE
+**Problem:** Confidence calibration on the progress page showed "10000%" for avg accuracy — a double-multiplication bug. The backend returned `avg_accuracy` already as a percentage (e.g., 100.0), but the frontend multiplied by 100 again. Also, the documents page had no "Generate Study Materials" button when selecting multiple documents.
 
-### 2. Landing Page Overhaul — Behavioral Economics + MCP/LLM Messaging
-**Status:** RESEARCH COMPLETE, IMPLEMENTATION PENDING  
-**Current landing page file:** `Code/frontend/src/app/page.tsx`
+**Changes made:**
+1. **CalibrationChart.tsx** — Removed double `* 100` on accuracy display, fixed confidence display to show as percentage, updated over/underconfident comparison to use matching 0-100 scales with 10-point threshold
+2. **documents/page.tsx** — Added "Generate Study Materials" button that appears when documents are selected, linking to the first selected document's generate page
 
-**Problems with current page:**
-- Generic hero copy ("Master your material, not just review it")
-- No mention of MCP server, LLM Skills, or the three delivery surfaces
-- No feature breakdown, screenshots, comparison, or social proof
-- Two competing CTAs of equal weight ("Get Started" + "Upload Material")
-- Trust bar uses jargon (FSRS v5, Bloom's) without context
+**Verification (2026-04-27):**
+- Committed and pushed to `origin/main`
 
-**Research completed — content brief ready:**
-Anki's landing page (ankiweb.net) analyzed. Behavioral economics principles mapped to 9 sections:
+---
+
+## REMAINING WORK
+
+Detailed plan and task list: `tasks/plan.md` and `tasks/todo.md`
+
+### Phase A: Landing Page Overhaul
+**Status:** NOT STARTED (research brief complete — see below)
+**Scope:** Replace placeholder hero with 9-section marketing page using behavioral economics principles.
+
+**Research brief (completed earlier):**
 
 | Section | Principle | Purpose |
 |---|---|---|
 | 1. Hero | Loss Aversion + Anchoring | "You forget 70% in 24 hours" — forgetting curve framing |
-| 2. Problem (Forgetting Curve) | Loss Aversion | Interactive/animated forgetting curve visualization |
+| 2. Problem (Forgetting Curve) | Loss Aversion | Animated forgetting curve visualization |
 | 3. Three Ways to Study | Status Quo Bias | MCP Server, LLM Skills, Web App — "zero new habits" |
 | 4. How It Works | Commitment/Consistency | Upload → Generate → Master — 3-step micro-commitments |
-| 5. Science Section | Anchoring + Authority | FSRS v5, Bloom's, 85% rule, Mastery with research citations |
+| 5. Science Section | Anchoring + Authority | FSRS v5, Bloom's, 85% rule with plain-language explanations |
 | 6. Comparison Table | Anchoring | StudyBros vs Traditional vs Anki vs Quizlet |
-| 7. Social Proof | Social Proof + Authority | Testimonials or research authority quotes |
-| 8. Instant Value CTA | Endowment Effect | Embed upload/paste on landing page — create ownership before signup |
+| 7. Social Proof | Social Proof + Authority | Research authority quotes |
+| 8. Instant Value CTA | Endowment Effect | Embed upload link on landing page |
 | 9. Footer CTA | Loss Aversion | "Every hour without SR, you lose 70%" |
 
-**Headline options for hero:**
-- "You forget 70% of what you study within 24 hours. Unless you don't."
-- "Stop re-learning what you already studied."
-- "Your brain forgets. StudyBros remembers for you."
+**Headline options:** "You forget 70% of what you study within 24 hours. Unless you don't." / "Stop re-learning what you already studied." / "Your brain forgets. StudyBros remembers for you."
 
-**CTA strategy:** Single primary CTA ("Try It Free — No Account Needed"), progressive commitment escalation through the page.
+→ **USER REVIEW CHECKPOINT** after implementation
 
-**Next step:** Run impeccable skills (audit, frontend-design) to implement the new landing page based on this brief.
+### Phase B: UI/UX Audit + Fixes
+**Status:** NOT STARTED (blocked on Phase A)
+**Scope:** Audit all 18 frontend routes + components across a11y, performance, resilience, design consistency, and UX flow. Fix critical and high issues.
 
----
+→ **USER REVIEW CHECKPOINT** after fixes
 
-## NOT STARTED
+### Phase C: Vercel Deployment
+**Status:** NOT STARTED (blocked on Phase B)
+**Scope:** Deploy frontend to Vercel + backend to Railway or Render (user choice). Update API URL config, CORS, smoke test production.
 
-### 3. Full UI/UX Review (Impeccable Audit)
-**Status:** PENDING (after landing page implementation)  
-**Scope:** Run `impeccable:audit` across the full frontend — dashboard, progress, study pages, achievements, upload flow. Check a11y, performance, resilience, and design consistency.
-
-### 5. Test the Fix End-to-End
-**Status:** COMPLETE  
-**Verification completed this session:**  
-- `pytest -q` passed for the full backend suite after contract-test updates
-- Live `uvicorn` smoke test passed against the main app endpoints
-- Real browser validation passed for `/dashboard` and `/progress` against live frontend + backend with seeded study data:
-  - Both pages returned HTTP 200
-  - Expected page markers rendered (`Knowledge Map`, `Knowledge Heat Map`)
-  - No browser console errors or warnings were captured
-  - No failed network requests were captured
-
-**Steps:**
-1. Start backend: `cd Code && uvicorn api.main:app --reload`
-2. Start frontend: `cd Code/frontend && npm run dev`
-3. Navigate to `/dashboard` — consistency section should render without error
-4. Navigate to `/progress` — consistency section should render without error
-5. Verify the 7-day calendar shows correct studied dates
-6. Verify the 30-day percentage displays correctly
+**Key decision needed:** Backend hosting — Railway (recommended), Render, or frontend-only demo?
 
 ---
 
@@ -381,6 +368,8 @@ Anki's landing page (ankiweb.net) analyzed. Behavioral economics principles mapp
 - **Project root:** `F:\CLAUDE\Capstone1\`
 - **Code root:** `F:\CLAUDE\Capstone1\Code\`
 - **Frontend:** `F:\CLAUDE\Capstone1\Code\frontend\`
+- **Task list:** `F:\CLAUDE\Capstone1\tasks\todo.md`
+- **Plan:** `F:\CLAUDE\Capstone1\tasks\plan.md`
 - **Project CLAUDE.md:** `F:\CLAUDE\Capstone1\CLAUDE.md` — has full architecture, conventions, phase checklist
 - **Research docs:** `F:\CLAUDE\Capstone1\StudyGuideResearch/` — read `00-INDEX.md` first
 - **Three delivery surfaces:** MCP Server, LLM Skills + docs, Web App on Vercel

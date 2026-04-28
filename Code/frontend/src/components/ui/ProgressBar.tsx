@@ -17,7 +17,14 @@ export function ProgressBar({ value, max = 100, color, label, showValue, classNa
           {showValue && <span className="text-text-muted font-mono text-xs">{Math.round(pct)}%</span>}
         </div>
       )}
-      <div className="h-2 rounded-full bg-bg-input overflow-hidden">
+      <div
+        className="h-2 rounded-full bg-bg-input overflow-hidden"
+        role="progressbar"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label ?? "Progress"}
+      >
         <div
           className="h-full rounded-full transition-all duration-500 ease-out"
           style={{

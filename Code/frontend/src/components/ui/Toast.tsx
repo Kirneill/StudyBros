@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ToastType = "success" | "error" | "info";
 
@@ -19,14 +19,19 @@ const typeStyles: Record<ToastType, string> = {
 
 export function Toast({ message, type = "info", duration = 4000, onDismiss }: ToastProps) {
   const [visible, setVisible] = useState(true);
+  const onDismissRef = useRef(onDismiss);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setVisible(false);
-      setTimeout(onDismiss, 300);
+      setTimeout(() => onDismissRef.current(), 300);
     }, duration);
     return () => clearTimeout(timer);
-  }, [duration, onDismiss]);
+  }, [duration]);
 
   return (
     <div

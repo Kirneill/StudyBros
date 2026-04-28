@@ -28,8 +28,6 @@ export default function StudySetCompletePage() {
       topic={studySet?.title ?? `Study Set ${id}`}
       stats={{
         totalItems: studySet?.item_count ?? 0,
-        accuracy: 0.94,
-        avgInterval: 45,
       }}
     />
   );

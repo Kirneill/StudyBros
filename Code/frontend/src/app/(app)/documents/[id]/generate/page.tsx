@@ -6,6 +6,7 @@ import { Button, Card, Modal, Spinner, Toast } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import Link from "next/link";
 import type {
   GenerateRequest,
   GenerationProvider,
@@ -177,7 +178,8 @@ export default function GeneratePage() {
 
   return (
     <div>
-      <h1 className="font-[family-name:var(--font-heading)] text-3xl font-bold mb-2">Generate Study Materials</h1>
+      <Link href={`/documents/${docId}`} className="text-sm text-text-muted hover:text-text-primary transition-colors">&larr; Back to {doc?.title || "Document"}</Link>
+      <h1 className="font-[family-name:var(--font-heading)] text-3xl font-bold mb-2 mt-4">Generate Study Materials</h1>
       <p className="text-text-secondary mb-8">from {doc?.title || "Untitled"}</p>
 
       <div className="max-w-xl space-y-6">

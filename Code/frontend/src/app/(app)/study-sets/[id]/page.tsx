@@ -78,11 +78,11 @@ export default function StudySetDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <a href={api.getExportUrl(id, "json")} download>
-            <Button variant="secondary" size="sm">Export JSON</Button>
+          <a href={api.getExportUrl(id, "json")} download className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent bg-bg-card border border-border text-text-primary hover:bg-bg-card-hover px-3 py-1.5 text-sm">
+            Export JSON
           </a>
-          <a href={api.getExportUrl(id, "markdown")} download>
-            <Button variant="secondary" size="sm">Export MD</Button>
+          <a href={api.getExportUrl(id, "markdown")} download className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent bg-bg-card border border-border text-text-primary hover:bg-bg-card-hover px-3 py-1.5 text-sm">
+            Export MD
           </a>
           <Button variant="ghost" size="sm" onClick={() => setShowDelete(true)}>Delete</Button>
         </div>
@@ -210,7 +210,7 @@ export default function StudySetDetailPage() {
         <p className="text-text-secondary mb-4">This will permanently delete this study set.</p>
         <div className="flex gap-3 justify-end">
           <Button variant="ghost" onClick={() => setShowDelete(false)}>Cancel</Button>
-          <Button onClick={handleDelete} loading={deleting} className="!bg-error hover:!bg-error/80">Delete</Button>
+          <Button onClick={handleDelete} loading={deleting} variant="destructive">Delete</Button>
         </div>
       </Modal>
 

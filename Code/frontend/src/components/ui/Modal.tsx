@@ -7,9 +7,10 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  preventClose?: boolean;
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, preventClose }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onCancel={(e) => { if (preventClose) e.preventDefault(); }}
       className="backdrop:bg-black/60 bg-bg-card border border-border rounded-2xl p-0 max-w-lg w-full text-text-primary shadow-2xl"
     >
       <div className="p-6">
