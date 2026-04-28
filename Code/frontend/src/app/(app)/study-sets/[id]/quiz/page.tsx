@@ -8,6 +8,7 @@ import { Button, Card, Badge, ErrorState, ProgressBar, Spinner } from "@/compone
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import type { QuizQuestion } from "@/lib/types";
+import { getPreferredProvider, getStoredApiKey } from "@/lib/provider-prefs";
 
 function parseQuizQuestions(content: Record<string, unknown> | unknown[]): QuizQuestion[] {
   const items = Array.isArray(content)
@@ -171,16 +172,40 @@ export default function QuizPage() {
 
         setAutoGenState("generating");
 
-        const providersRes = await api.getGenerationProviders();
-        const serverProviders = providersRes.providers.filter((p) => p.has_server_key);
+        const preferredProvider = getPreferredProvider();
+        const preferredKey = preferredProvider ? getStoredApiKey(preferredProvider) : null;
 
-        if (serverProviders.length === 0) {
-          setAutoGenState("error");
-          setAutoGenError("No AI provider is configured on the server. Ask your admin to add an API key.");
-          return;
+        if (preferredProvider && preferredKey) {
+          try {
+            const newQuiz = await api.generateQuiz({
+              document_id: documentId,
+              count: 10,
+              difficulty: "mixed",
+              provider: preferredProvider,
+              api_key: preferredKey,
+            });
+            if (cancelled) return;
+            router.replace(`/study-sets/${newQuiz.id}/quiz`);
+            return;
+          } catch (prefErr) {
+            if (cancelled) return;
+            const isAuthError =
+              prefErr instanceof api.ApiError &&
+              (prefErr.status === 401 || prefErr.status === 403 || prefErr.status === 400 || prefErr.status === 503);
+            if (!isAuthError) throw prefErr;
+          }
         }
 
         if (cancelled) return;
+
+        const providersRes = await api.getGenerationProviders();
+        const serverProviders = providersRes.providers.filter((p) => p.has_server_key);
+
+        if (serverProviders.length === 0 && !preferredKey) {
+          setAutoGenState("error");
+          setAutoGenError("No AI provider configured. Go to Settings to add your API key.");
+          return;
+        }
 
         let lastErr: unknown;
         for (const provider of serverProviders) {
@@ -199,7 +224,7 @@ export default function QuizPage() {
             lastErr = providerErr;
             const isAuthError =
               providerErr instanceof api.ApiError &&
-              (providerErr.status === 401 || providerErr.status === 403 || providerErr.status === 503);
+              (providerErr.status === 401 || providerErr.status === 403 || providerErr.status === 400 || providerErr.status === 503);
             if (!isAuthError) throw providerErr;
           }
         }

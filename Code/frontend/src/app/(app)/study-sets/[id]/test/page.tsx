@@ -8,6 +8,7 @@ import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import type { GenerationProvider } from "@/lib/types";
+import { getPreferredProvider, getStoredApiKey } from "@/lib/provider-prefs";
 import Link from "next/link";
 
 interface TestQuestion {
@@ -162,20 +163,42 @@ export default function PracticeTestPage() {
 
         setAutoGenState("generating");
 
+        const preferredProvider = getPreferredProvider();
+        const preferredKey = preferredProvider ? getStoredApiKey(preferredProvider) : null;
+
+        if (preferredProvider && preferredKey) {
+          try {
+            const newTest = await api.generatePracticeTest({
+              document_id: docId,
+              count: 10,
+              difficulty: "mixed",
+              provider: preferredProvider,
+              api_key: preferredKey,
+            });
+            if (cancelled) return;
+            router.replace(`/study-sets/${newTest.id}/test`);
+            return;
+          } catch (prefErr) {
+            if (cancelled) return;
+            const isAuthError =
+              prefErr instanceof ApiError &&
+              (prefErr.status === 401 || prefErr.status === 403 || prefErr.status === 400 || prefErr.status === 503);
+            if (!isAuthError) throw prefErr;
+          }
+        }
+
+        if (cancelled) return;
+
         const providersRes = await api.getGenerationProviders();
         const serverProviders = providersRes.providers.filter(
           (p) => p.has_server_key,
         );
 
-        if (serverProviders.length === 0) {
+        if (serverProviders.length === 0 && !preferredKey) {
           setAutoGenState("error");
-          setAutoGenError(
-            "No AI provider with a server key is configured. Ask an admin to set one up.",
-          );
+          setAutoGenError("No AI provider configured. Go to Settings to add your API key.");
           return;
         }
-
-        if (cancelled) return;
 
         let lastErr: unknown;
         for (const provider of serverProviders) {
@@ -194,7 +217,7 @@ export default function PracticeTestPage() {
             lastErr = providerErr;
             const isAuthError =
               providerErr instanceof ApiError &&
-              (providerErr.status === 401 || providerErr.status === 403 || providerErr.status === 503);
+              (providerErr.status === 401 || providerErr.status === 403 || providerErr.status === 400 || providerErr.status === 503);
             if (!isAuthError) throw providerErr;
           }
         }

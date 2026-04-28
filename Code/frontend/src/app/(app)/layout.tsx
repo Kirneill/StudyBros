@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/study-sets", label: "Study Sets", icon: "📚" },
   { href: "/progress", label: "Progress", icon: "📊" },
   { href: "/achievements", label: "Achievements", icon: "🏆" },
+  { href: "/settings", label: "Settings", icon: "⚙" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
