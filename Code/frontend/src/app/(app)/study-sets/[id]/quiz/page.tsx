@@ -104,6 +104,7 @@ export default function QuizPage() {
   const [quizDone, setQuizDone] = useState(false);
   const [autoGenState, setAutoGenState] = useState<"idle" | "checking" | "generating" | "error">("idle");
   const [autoGenError, setAutoGenError] = useState<string | null>(null);
+  const [autoGenTrigger, setAutoGenTrigger] = useState(0);
 
   const questions = useMemo(
     () => (studySet ? parseQuizQuestions(studySet.content) : []),
@@ -207,10 +208,12 @@ export default function QuizPage() {
     return () => {
       cancelled = true;
     };
-  }, [studySet, questions.length, loading, autoGenState, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studySet, questions.length, loading, autoGenTrigger]);
 
   const handleRetryAutoGen = () => {
     setAutoGenState("idle");
+    setAutoGenTrigger((n) => n + 1);
   };
 
   const handleAnswer = (index: number) => {

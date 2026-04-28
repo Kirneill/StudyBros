@@ -95,6 +95,7 @@ export default function PracticeTestPage() {
     "idle" | "checking" | "generating" | "error"
   >("idle");
   const [autoGenError, setAutoGenError] = useState<string | null>(null);
+  const [autoGenTrigger, setAutoGenTrigger] = useState(0);
 
   /* M21: Memoize questions derivation */
   const questions: TestQuestion[] = useMemo(() => {
@@ -202,7 +203,8 @@ export default function PracticeTestPage() {
     return () => {
       cancelled = true;
     };
-  }, [studySet, questions.length, autoGenState, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studySet, questions.length, autoGenTrigger]);
 
   const handleSelect = (qIndex: number, optionIndex: number) => {
     if (submitted) return;
@@ -293,7 +295,7 @@ export default function PracticeTestPage() {
           <div className="flex gap-4 justify-center mt-4">
             <Button
               variant="secondary"
-              onClick={() => setAutoGenState("idle")}
+              onClick={() => { setAutoGenState("idle"); setAutoGenTrigger((n) => n + 1); }}
             >
               Retry
             </Button>
