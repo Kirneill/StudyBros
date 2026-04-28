@@ -80,7 +80,7 @@ export function MasteryTree({ topics, onTopicClick }: MasteryTreeProps) {
         if (onTopicClick) {
           return (
             <motion.button
-              key={topic.topic}
+              key={`${topic.topic}-${i}`}
               initial={initial}
               animate={animate}
               transition={{ delay }}
@@ -94,7 +94,7 @@ export function MasteryTree({ topics, onTopicClick }: MasteryTreeProps) {
 
         return (
           <motion.div
-            key={topic.topic}
+            key={`${topic.topic}-${i}`}
             initial={initial}
             animate={animate}
             transition={{ delay }}

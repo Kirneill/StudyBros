@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Button, Card, Badge, ErrorState, Spinner } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import * as api from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import type { GenerationProvider } from "@/lib/types";
 import Link from "next/link";
 
 interface TestQuestion {
@@ -55,6 +57,7 @@ const BLOOM_LABELS: Record<number, string> = {
 
 export default function PracticeTestPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const studySetId = Number(id);
 
   /* C1: Wire up error + refetch */
@@ -88,6 +91,10 @@ export default function PracticeTestPage() {
     return {};
   });
   const [submitted, setSubmitted] = useState(false);
+  const [autoGenState, setAutoGenState] = useState<
+    "idle" | "checking" | "generating" | "error"
+  >("idle");
+  const [autoGenError, setAutoGenError] = useState<string | null>(null);
 
   /* M21: Memoize questions derivation */
   const questions: TestQuestion[] = useMemo(() => {
@@ -126,6 +133,76 @@ export default function PracticeTestPage() {
       return () => window.removeEventListener("beforeunload", handler);
     }
   }, [answers, submitted]);
+
+  useEffect(() => {
+    if (!studySet || questions.length > 0) return;
+    if (studySet.set_type !== "flashcards" || !studySet.document_id) return;
+    if (autoGenState !== "idle") return;
+
+    let cancelled = false;
+    const docId = studySet.document_id;
+
+    async function autoGenerate() {
+      setAutoGenState("checking");
+      setAutoGenError(null);
+
+      try {
+        const allSets = await api.listStudySets();
+        const existing = allSets.find(
+          (s) => s.set_type === "practice_test" && s.document_id === docId,
+        );
+
+        if (cancelled) return;
+
+        if (existing) {
+          router.replace(`/study-sets/${existing.id}/test`);
+          return;
+        }
+
+        setAutoGenState("generating");
+
+        const providersRes = await api.getGenerationProviders();
+        const serverProvider = providersRes.providers.find(
+          (p) => p.has_server_key,
+        );
+
+        if (!serverProvider) {
+          setAutoGenState("error");
+          setAutoGenError(
+            "No AI provider with a server key is configured. Ask an admin to set one up.",
+          );
+          return;
+        }
+
+        if (cancelled) return;
+
+        const newTest = await api.generatePracticeTest({
+          document_id: docId,
+          count: 10,
+          difficulty: "mixed",
+          provider: serverProvider.provider as GenerationProvider,
+        });
+
+        if (cancelled) return;
+
+        router.replace(`/study-sets/${newTest.id}/test`);
+      } catch (err) {
+        if (cancelled) return;
+        setAutoGenState("error");
+        setAutoGenError(
+          err instanceof ApiError
+            ? err.detail
+            : "Failed to generate practice test. Please try again.",
+        );
+      }
+    }
+
+    autoGenerate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [studySet, questions.length, autoGenState, router]);
 
   const handleSelect = (qIndex: number, optionIndex: number) => {
     if (submitted) return;
@@ -184,6 +261,50 @@ export default function PracticeTestPage() {
   }
 
   if (questions.length === 0) {
+    if (autoGenState === "checking") {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Spinner size="lg" />
+          <p className="text-text-muted text-lg">
+            Looking for a practice test...
+          </p>
+        </div>
+      );
+    }
+
+    if (autoGenState === "generating") {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Spinner size="lg" />
+          <p className="text-text-muted text-lg">
+            Generating practice test from your flashcards...
+          </p>
+          <p className="text-text-muted text-sm">This may take a moment</p>
+        </div>
+      );
+    }
+
+    if (autoGenState === "error") {
+      return (
+        <div className="text-center py-20">
+          <p className="text-error text-lg mb-2">
+            {autoGenError ?? "Something went wrong."}
+          </p>
+          <div className="flex gap-4 justify-center mt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setAutoGenState("idle")}
+            >
+              Retry
+            </Button>
+            <Link href={`/study-sets/${studySetId}`}>
+              <Button variant="secondary">Back to Study Set</Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="text-center py-20">
         <p className="text-text-muted text-lg mb-4">

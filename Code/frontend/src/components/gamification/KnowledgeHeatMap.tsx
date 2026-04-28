@@ -24,9 +24,9 @@ export function KnowledgeHeatMap({ topics }: KnowledgeHeatMapProps) {
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        {topics.map((t) => (
+        {topics.map((t, i) => (
           <div
-            key={t.topic}
+            key={`${t.topic}-${i}`}
             role="img"
             aria-label={`${t.topic}: ${getMasteryLabel(t.mastery_level)}`}
             className={`w-8 h-8 rounded-md ${getColor(t.mastery_level)} transition-colors`}

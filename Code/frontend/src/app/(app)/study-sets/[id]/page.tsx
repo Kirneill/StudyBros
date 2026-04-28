@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, Button, Badge, Spinner, Modal, Toast, ErrorState } from "@/components/ui";
 import { ForgettingCurve } from "@/components/gamification";
@@ -76,6 +76,22 @@ export default function StudySetDetailPage() {
   const typeInfo = STUDY_SET_TYPES[studySet.set_type as keyof typeof STUDY_SET_TYPES];
   const items = getStudySetItems(studySet.content);
 
+  const cardLabels = useMemo(() => {
+    const labels = new Map<number, string>();
+    items.forEach((item, i) => {
+      if (typeof item === "string") {
+        labels.set(i, item.length > 80 ? `${item.slice(0, 80)}…` : item);
+        return;
+      }
+      const obj = item as Record<string, unknown>;
+      const text = String(obj.front ?? obj.question ?? obj.prompt ?? "");
+      if (text) {
+        labels.set(i, text.length > 80 ? `${text.slice(0, 80)}…` : text);
+      }
+    });
+    return labels;
+  }, [items]);
+
   return (
     <div>
       <div className="flex items-start justify-between mb-8">
@@ -136,7 +152,7 @@ export default function StudySetDetailPage() {
               </Badge>
             </div>
           </CardHeader>
-          <ForgettingCurve cards={schedule.cards} />
+          <ForgettingCurve cards={schedule.cards} cardLabels={cardLabels} />
         </Card>
       )}
 

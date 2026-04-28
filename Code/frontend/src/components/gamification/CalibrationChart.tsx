@@ -5,9 +5,9 @@ interface CalibrationChartProps {
 }
 
 export function CalibrationChart({ calibration }: CalibrationChartProps) {
-  const avgConfidence = calibration.avg_confidence;
-  const avgAccuracy = calibration.avg_accuracy;
-  const score = calibration.calibration_score;
+  const avgConfidence = calibration.avg_confidence ?? 0;
+  const avgAccuracy = calibration.avg_accuracy ?? 0;
+  const score = calibration.calibration_score ?? 0;
 
   const isOverconfident = avgConfidence > avgAccuracy + 10;
   const isUnderconfident = avgConfidence < avgAccuracy - 10;

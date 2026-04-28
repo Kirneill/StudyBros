@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button, Card, Badge, ErrorState, ProgressBar, Spinner } from "@/components/ui";
@@ -68,6 +68,7 @@ interface PersistedQuizState {
 
 export default function QuizPage() {
   const params = useParams();
+  const router = useRouter();
   const studySetId = Number(params.id);
 
   /* C1: Wire up error + refetch */
@@ -101,6 +102,8 @@ export default function QuizPage() {
     return [];
   });
   const [quizDone, setQuizDone] = useState(false);
+  const [autoGenState, setAutoGenState] = useState<"idle" | "checking" | "generating" | "error">("idle");
+  const [autoGenError, setAutoGenError] = useState<string | null>(null);
 
   const questions = useMemo(
     () => (studySet ? parseQuizQuestions(studySet.content) : []),
@@ -139,6 +142,76 @@ export default function QuizPage() {
       return () => window.removeEventListener("beforeunload", handler);
     }
   }, [results.length, quizDone]);
+
+  useEffect(() => {
+    if (!studySet || questions.length > 0 || loading) return;
+    if (studySet.set_type !== "flashcards" || !studySet.document_id) return;
+    if (autoGenState !== "idle") return;
+
+    let cancelled = false;
+    const documentId = studySet.document_id;
+
+    async function autoGenerate() {
+      setAutoGenState("checking");
+      setAutoGenError(null);
+
+      try {
+        const allSets = await api.listStudySets();
+        const existingQuiz = allSets.find(
+          (s) => s.set_type === "quiz" && s.document_id === documentId,
+        );
+
+        if (cancelled) return;
+
+        if (existingQuiz) {
+          router.replace(`/study-sets/${existingQuiz.id}/quiz`);
+          return;
+        }
+
+        setAutoGenState("generating");
+
+        const providersRes = await api.getGenerationProviders();
+        const serverProvider = providersRes.providers.find((p) => p.has_server_key);
+
+        if (!serverProvider) {
+          setAutoGenState("error");
+          setAutoGenError("No AI provider is configured on the server. Ask your admin to add an API key.");
+          return;
+        }
+
+        if (cancelled) return;
+
+        const newQuiz = await api.generateQuiz({
+          document_id: documentId,
+          count: 10,
+          difficulty: "mixed",
+          provider: serverProvider.provider,
+        });
+
+        if (cancelled) return;
+
+        router.replace(`/study-sets/${newQuiz.id}/quiz`);
+      } catch (err) {
+        if (cancelled) return;
+        setAutoGenState("error");
+        setAutoGenError(
+          err instanceof api.ApiError
+            ? err.detail
+            : "Failed to generate quiz. Please try again.",
+        );
+      }
+    }
+
+    autoGenerate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [studySet, questions.length, loading, autoGenState, router]);
+
+  const handleRetryAutoGen = () => {
+    setAutoGenState("idle");
+  };
 
   const handleAnswer = (index: number) => {
     if (answered) return;
@@ -186,6 +259,42 @@ export default function QuizPage() {
   }
 
   if (questions.length === 0) {
+    if (autoGenState === "checking") {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Spinner size="lg" />
+          <p className="text-text-muted text-lg">Looking for a quiz...</p>
+        </div>
+      );
+    }
+
+    if (autoGenState === "generating") {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Spinner size="lg" />
+          <p className="text-text-muted text-lg">Generating quiz from your flashcards...</p>
+          <p className="text-text-muted text-sm">This may take a moment</p>
+        </div>
+      );
+    }
+
+    if (autoGenState === "error") {
+      return (
+        <div className="text-center py-20">
+          <p className="text-error text-lg mb-2">Quiz generation failed</p>
+          <p className="text-text-muted text-sm mb-6">{autoGenError}</p>
+          <div className="flex gap-4 justify-center">
+            <Button variant="secondary" onClick={handleRetryAutoGen}>
+              Try Again
+            </Button>
+            <Link href={`/study-sets/${studySetId}`}>
+              <Button variant="secondary">Back to Study Set</Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="text-center py-20">
         <p className="text-text-muted text-lg mb-4">

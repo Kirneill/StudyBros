@@ -422,21 +422,30 @@ function RatingPanel({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <p className="text-xs text-text-muted text-center mb-2">
-            How confident are you? (1-5)
+          <p className="text-xs text-text-muted text-center mb-1">
+            Before seeing the answer, how sure were you that you'd get it right?
           </p>
-          <div className="flex justify-center gap-2">
-            {[1, 2, 3, 4, 5].map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => handleConfidenceClick(c)}
-                disabled={disabled}
-                className="w-11 h-11 rounded-lg border border-border text-sm font-medium transition-colors hover:bg-bg-card-hover text-text-secondary disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-              >
-                {c}
-              </button>
-            ))}
+          <p className="text-[10px] text-text-muted/70 text-center mb-2">
+            This helps track how well you predict your own knowledge over time.
+          </p>
+          <div className="w-fit mx-auto">
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => handleConfidenceClick(c)}
+                  disabled={disabled}
+                  className="w-11 h-11 rounded-lg border border-border text-sm font-medium transition-colors hover:bg-bg-card-hover text-text-secondary disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-text-muted">Not sure</span>
+              <span className="text-[10px] text-text-muted">Certain</span>
+            </div>
           </div>
         </motion.div>
       )}
