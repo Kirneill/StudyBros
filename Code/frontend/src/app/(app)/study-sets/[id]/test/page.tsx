@@ -163,11 +163,11 @@ export default function PracticeTestPage() {
         setAutoGenState("generating");
 
         const providersRes = await api.getGenerationProviders();
-        const serverProvider = providersRes.providers.find(
+        const serverProviders = providersRes.providers.filter(
           (p) => p.has_server_key,
         );
 
-        if (!serverProvider) {
+        if (serverProviders.length === 0) {
           setAutoGenState("error");
           setAutoGenError(
             "No AI provider with a server key is configured. Ask an admin to set one up.",
@@ -177,16 +177,28 @@ export default function PracticeTestPage() {
 
         if (cancelled) return;
 
-        const newTest = await api.generatePracticeTest({
-          document_id: docId,
-          count: 10,
-          difficulty: "mixed",
-          provider: serverProvider.provider as GenerationProvider,
-        });
-
-        if (cancelled) return;
-
-        router.replace(`/study-sets/${newTest.id}/test`);
+        let lastErr: unknown;
+        for (const provider of serverProviders) {
+          if (cancelled) return;
+          try {
+            const newTest = await api.generatePracticeTest({
+              document_id: docId,
+              count: 10,
+              difficulty: "mixed",
+              provider: provider.provider as GenerationProvider,
+            });
+            if (cancelled) return;
+            router.replace(`/study-sets/${newTest.id}/test`);
+            return;
+          } catch (providerErr) {
+            lastErr = providerErr;
+            const isAuthError =
+              providerErr instanceof ApiError &&
+              (providerErr.status === 401 || providerErr.status === 403 || providerErr.status === 503);
+            if (!isAuthError) throw providerErr;
+          }
+        }
+        throw lastErr;
       } catch (err) {
         if (cancelled) return;
         setAutoGenState("error");

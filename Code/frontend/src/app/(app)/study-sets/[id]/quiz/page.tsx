@@ -172,9 +172,9 @@ export default function QuizPage() {
         setAutoGenState("generating");
 
         const providersRes = await api.getGenerationProviders();
-        const serverProvider = providersRes.providers.find((p) => p.has_server_key);
+        const serverProviders = providersRes.providers.filter((p) => p.has_server_key);
 
-        if (!serverProvider) {
+        if (serverProviders.length === 0) {
           setAutoGenState("error");
           setAutoGenError("No AI provider is configured on the server. Ask your admin to add an API key.");
           return;
@@ -182,16 +182,28 @@ export default function QuizPage() {
 
         if (cancelled) return;
 
-        const newQuiz = await api.generateQuiz({
-          document_id: documentId,
-          count: 10,
-          difficulty: "mixed",
-          provider: serverProvider.provider,
-        });
-
-        if (cancelled) return;
-
-        router.replace(`/study-sets/${newQuiz.id}/quiz`);
+        let lastErr: unknown;
+        for (const provider of serverProviders) {
+          if (cancelled) return;
+          try {
+            const newQuiz = await api.generateQuiz({
+              document_id: documentId,
+              count: 10,
+              difficulty: "mixed",
+              provider: provider.provider,
+            });
+            if (cancelled) return;
+            router.replace(`/study-sets/${newQuiz.id}/quiz`);
+            return;
+          } catch (providerErr) {
+            lastErr = providerErr;
+            const isAuthError =
+              providerErr instanceof api.ApiError &&
+              (providerErr.status === 401 || providerErr.status === 403 || providerErr.status === 503);
+            if (!isAuthError) throw providerErr;
+          }
+        }
+        throw lastErr;
       } catch (err) {
         if (cancelled) return;
         setAutoGenState("error");
