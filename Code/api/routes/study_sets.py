@@ -12,6 +12,7 @@ from study_guide.database.operations import DatabaseOperations
 router = APIRouter()
 
 
+@router.get("", response_model=list[StudySetResponse])
 @router.get("/", response_model=list[StudySetResponse])
 def list_study_sets(db: Session = Depends(get_db)):
     """List all study sets."""

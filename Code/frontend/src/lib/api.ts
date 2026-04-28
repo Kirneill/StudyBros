@@ -52,7 +52,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const checkHealth = () => request<{ status: string }>("/api/health");
 
 // Documents
-export const listDocuments = () => request<Document[]>("/api/documents/");
+export const listDocuments = () => request<Document[]>("/api/documents");
 export const getDocument = (id: number) => request<Document>(`/api/documents/${id}`);
 export const getDocumentChunks = (id: number) => request<Chunk[]>(`/api/documents/${id}/chunks`);
 export const updateDocument = (id: number, req: UpdateDocumentRequest) =>
@@ -85,7 +85,7 @@ export async function uploadFile(file: File): Promise<Document> {
 }
 
 // Study Sets
-export const listStudySets = () => request<StudySet[]>("/api/study-sets/");
+export const listStudySets = () => request<StudySet[]>("/api/study-sets");
 export const getStudySet = (id: number) => request<StudySetDetail>(`/api/study-sets/${id}`);
 export const deleteStudySet = (id: number) =>
   request<{ detail: string }>(`/api/study-sets/${id}`, { method: "DELETE" });

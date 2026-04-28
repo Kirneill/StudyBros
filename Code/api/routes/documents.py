@@ -16,6 +16,7 @@ from study_guide.database.operations import DatabaseOperations
 router = APIRouter()
 
 
+@router.get("", response_model=list[DocumentResponse])
 @router.get("/", response_model=list[DocumentResponse])
 def list_documents(db: Session = Depends(get_db)):
     """List all documents."""
