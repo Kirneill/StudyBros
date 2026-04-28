@@ -209,16 +209,30 @@ export default function AISetupPage() {
               </p>
               <Card>
                 <p className="text-text-secondary text-sm mb-4">
-                  Share one of these URLs with your LLM:
+                  Copy one of these URLs and paste it into your LLM:
                 </p>
                 <div className="space-y-2">
                   <div className="bg-bg-input rounded-lg px-4 py-2.5 font-[family-name:var(--font-mono)] text-sm">
-                    <span className="text-text-muted">Quick summary:</span>{" "}
-                    <span className="text-accent">llms.txt</span>
+                    <span className="text-text-muted">Quick summary: </span>
+                    <a
+                      href="https://raw.githubusercontent.com/Kirneill/StudyBros/main/Code/docs/llms.txt"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:text-accent-hover underline underline-offset-4 break-all"
+                    >
+                      https://raw.githubusercontent.com/Kirneill/StudyBros/main/Code/docs/llms.txt
+                    </a>
                   </div>
                   <div className="bg-bg-input rounded-lg px-4 py-2.5 font-[family-name:var(--font-mono)] text-sm">
-                    <span className="text-text-muted">Full reference:</span>{" "}
-                    <span className="text-accent">llms-full.txt</span>
+                    <span className="text-text-muted">Full reference: </span>
+                    <a
+                      href="https://raw.githubusercontent.com/Kirneill/StudyBros/main/Code/docs/llms-full.txt"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:text-accent-hover underline underline-offset-4 break-all"
+                    >
+                      https://raw.githubusercontent.com/Kirneill/StudyBros/main/Code/docs/llms-full.txt
+                    </a>
                   </div>
                 </div>
                 <p className="text-text-muted text-xs mt-4">

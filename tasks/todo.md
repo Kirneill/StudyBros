@@ -81,16 +81,6 @@ Last updated: 2026-04-27
 
 ---
 
-## Deferred Items
-
-### D1. Add real LLM Skills URLs to AI Setup page
-- [ ] **Status:** BLOCKED (needs backend deployment)
-- **File:** `Code/frontend/src/app/docs/ai-setup/page.tsx`
-- **Problem:** The "LLM Skills (Paste a Link)" section references `llms.txt` and `llms-full.txt` but has no actual URLs to copy. The files exist in the repo at `Code/docs/` but aren't hosted yet.
-- **Fix:** Once the backend is deployed, update the page with real hosted URLs (e.g., `https://your-domain/docs/llms.txt`). Alternatively, link to the raw GitHub files as an interim solution: `https://raw.githubusercontent.com/Kirneill/StudyBros/main/Code/docs/llms.txt`
-
----
-
 ## Phase C: Vercel Deployment
 
 ### C1. Backend Hosting Decision
