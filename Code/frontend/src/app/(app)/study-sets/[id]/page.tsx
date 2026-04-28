@@ -41,6 +41,24 @@ export default function StudySetDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  const cardLabels = useMemo(() => {
+    if (!studySet) return new Map<number, string>();
+    const items = getStudySetItems(studySet.content);
+    const labels = new Map<number, string>();
+    items.forEach((item, i) => {
+      if (typeof item === "string") {
+        labels.set(i, item.length > 80 ? `${item.slice(0, 80)}…` : item);
+        return;
+      }
+      const obj = item as Record<string, unknown>;
+      const text = String(obj.front ?? obj.question ?? obj.prompt ?? "");
+      if (text) {
+        labels.set(i, text.length > 80 ? `${text.slice(0, 80)}…` : text);
+      }
+    });
+    return labels;
+  }, [studySet]);
+
   const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
@@ -75,22 +93,6 @@ export default function StudySetDetailPage() {
 
   const typeInfo = STUDY_SET_TYPES[studySet.set_type as keyof typeof STUDY_SET_TYPES];
   const items = getStudySetItems(studySet.content);
-
-  const cardLabels = useMemo(() => {
-    const labels = new Map<number, string>();
-    items.forEach((item, i) => {
-      if (typeof item === "string") {
-        labels.set(i, item.length > 80 ? `${item.slice(0, 80)}…` : item);
-        return;
-      }
-      const obj = item as Record<string, unknown>;
-      const text = String(obj.front ?? obj.question ?? obj.prompt ?? "");
-      if (text) {
-        labels.set(i, text.length > 80 ? `${text.slice(0, 80)}…` : text);
-      }
-    });
-    return labels;
-  }, [items]);
 
   return (
     <div>
