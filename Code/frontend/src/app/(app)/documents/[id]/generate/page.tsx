@@ -29,6 +29,7 @@ const PROVIDER_LABELS: Record<GenerationProvider, string> = {
   openai: "OpenAI",
   anthropic: "Claude",
   openrouter: "OpenRouter",
+  codex: "Codex CLI",
 };
 
 function isProviderCredentialError(message: string): boolean {
@@ -50,6 +51,7 @@ function getStoredProviderKeys(): ProviderKeyState {
   }
 
   const storedKeys: ProviderKeyState = {};
+  // codex is intentionally omitted: it uses local login and never stores a key.
   (["openai", "anthropic", "openrouter"] as GenerationProvider[]).forEach((candidate) => {
     const key = window.sessionStorage.getItem(`${PROVIDER_STORAGE_PREFIX}${candidate}`);
     if (key) {
@@ -145,11 +147,19 @@ export default function GeneratePage() {
       }, 1500);
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : "Generation failed";
-      setToast({ message, type: "error" });
-      if (isProviderCredentialError(message)) {
-        openKeyModal(
-          `The current ${PROVIDER_LABELS[effectiveProvider]} key failed. Enter your own key to override it for this browser and try again.`,
-        );
+      // Codex has no API key: never open the key modal. Show an actionable hint.
+      if (effectiveProvider === "codex") {
+        setToast({
+          message: `${message} — check that \`codex login\` is authenticated on the server.`,
+          type: "error",
+        });
+      } else {
+        setToast({ message, type: "error" });
+        if (isProviderCredentialError(message)) {
+          openKeyModal(
+            `The current ${PROVIDER_LABELS[effectiveProvider]} key failed. Enter your own key to override it for this browser and try again.`,
+          );
+        }
       }
     } finally {
       setGenerating(false);
@@ -157,7 +167,10 @@ export default function GeneratePage() {
   }, [activeClientKey, count, difficulty, docId, effectiveProvider, genType, openKeyModal, router]);
 
   const handleGenerate = useCallback(async () => {
-    if (!selectedProvider?.has_server_key && !activeClientKey) {
+    // Codex uses local login, not an API key: never prompt for a key. If the CLI
+    // is unavailable (has_server_key false) let the request run and surface the
+    // server's 503 with an actionable hint via runGenerate's catch.
+    if (effectiveProvider !== "codex" && !selectedProvider?.has_server_key && !activeClientKey) {
       openKeyModal(
         `The server does not have a ${PROVIDER_LABELS[effectiveProvider]} key configured. Enter your key to continue.`,
       );
@@ -224,11 +237,22 @@ export default function GeneratePage() {
                 }`}
               >
                 <span className="text-sm font-semibold block mb-1">{entry.display_name}</span>
-                <span className="text-xs text-text-muted block">{entry.default_model}</span>
+                <span className="text-xs text-text-muted block">
+                  {entry.provider === "codex" ? "local login" : entry.default_model}
+                </span>
               </button>
             ))}
           </div>
-          {selectedProvider && (
+          {selectedProvider && effectiveProvider === "codex" && (
+            <Card className="mt-3 p-4">
+              <p className="text-sm text-text-secondary">
+                {selectedProvider.has_server_key
+                  ? "Codex CLI uses the server's local login — no API key required."
+                  : "Codex CLI is not detected on the server. Ask the operator to install it and run `codex login`."}
+              </p>
+            </Card>
+          )}
+          {selectedProvider && effectiveProvider !== "codex" && (
             <Card className="mt-3 p-4">
               <p className="text-sm text-text-secondary">
                 {activeClientKey
