@@ -177,6 +177,62 @@ def test_codex_auth_pattern_stderr_returns_401():
     assert "codex login" in result.error.lower()
 
 
+def test_codex_rejects_metacharacter_model_without_spawning():
+    """A model with cmd.exe metacharacters is rejected 400 before any subprocess."""
+    with patch(
+        "study_guide.generation.generator.shutil.which", return_value=_FAKE_CODEX
+    ), patch("study_guide.generation.generator.subprocess.run") as mock_run:
+        gen = StudyMaterialGenerator(provider="codex", model='x" & calc & "')
+        result = gen.generate_flashcards("content", count=1)
+
+    assert result.success is False
+    assert result.status_code == 400
+    assert result.error is not None
+    assert "invalid model name" in result.error.lower()
+    mock_run.assert_not_called()
+
+
+def test_codex_accepts_legit_model_passes_to_flag():
+    """A legitimate model id passes validation and reaches the -m flag."""
+    captured: dict[str, object] = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = argv
+        Path(_output_path_from_argv(argv)).write_text(
+            json.dumps(_VALID_FLASHCARDS), encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    with patch(
+        "study_guide.generation.generator.shutil.which", return_value=_FAKE_CODEX
+    ), patch("study_guide.generation.generator.subprocess.run", side_effect=fake_run):
+        gen = StudyMaterialGenerator(provider="codex", model="gpt-5.6-terra")
+        result = gen.generate_flashcards("content", count=1)
+
+    argv = captured["argv"]
+    assert isinstance(argv, list)
+    assert argv[argv.index("-m") + 1] == "gpt-5.6-terra"
+    assert result.success is True
+    assert result.model == "gpt-5.6-terra"
+
+
+def test_codex_auth_substring_in_word_maps_to_502_not_401():
+    """stderr like 'authored by' must NOT be misread as an auth error."""
+
+    def fake_run(argv, **kwargs):
+        return subprocess.CompletedProcess(
+            argv, 1, stdout="", stderr="crash in module authored by acme"
+        )
+
+    with patch(
+        "study_guide.generation.generator.shutil.which", return_value=_FAKE_CODEX
+    ), patch("study_guide.generation.generator.subprocess.run", side_effect=fake_run):
+        result = _make_generator().generate_flashcards("content", count=1)
+
+    assert result.success is False
+    assert result.status_code == 502
+
+
 def test_codex_invalid_json_returns_502():
     """Exit 0 but unparseable output maps to 502."""
 

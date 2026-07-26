@@ -397,6 +397,24 @@ def test_generate_flashcards_with_codex(client, monkeypatch):
     assert data["set_type"] == "flashcards"
 
 
+def test_generate_rejects_metacharacter_model_with_422(client, monkeypatch):
+    """A model id with shell metacharacters is rejected at request validation."""
+    doc_id, _ = _seed_document()
+    monkeypatch.setattr(type(config), "is_codex_cli_available", classmethod(lambda cls: True))
+
+    response = client.post(
+        "/api/generate/flashcards",
+        json={
+            "document_id": doc_id,
+            "count": 3,
+            "difficulty": "mixed",
+            "provider": "codex",
+            "model": 'x" & calc & "',
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_generate_with_codex_cli_missing_returns_503(client, monkeypatch):
     """When the codex CLI is not on PATH, the route rejects with 503."""
     doc_id, _ = _seed_document()

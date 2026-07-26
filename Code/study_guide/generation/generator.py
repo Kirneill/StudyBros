@@ -3,6 +3,7 @@ Study material generator using provider-specific LLM APIs.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -33,8 +34,17 @@ GenerationProvider = Literal["openai", "anthropic", "openrouter", "codex"]
 T = TypeVar("T", bound=BaseModel)
 
 # stderr/stdout fragments that indicate a Codex login/auth problem rather than
-# a transient failure. Matched case-insensitively.
-_CODEX_AUTH_PATTERNS = ("login", "auth", "401", "unauthorized")
+# a transient failure. Matched case-insensitively. Kept tight so substrings like
+# "authored by" do not misclassify unrelated failures as 401.
+_CODEX_AUTH_PATTERNS = ("not logged in", "login", "unauthorized", "401", "authentication")
+
+# Allowed characters for a codex `-m <model>` argument. Excludes shell/cmd.exe
+# metacharacters (&, |, %, ", ^, <, >, spaces, /) because on Windows the resolved
+# `codex.cmd` shim re-enters cmd.exe, which re-parses metacharacters that Python's
+# argv quoting does not escape (BatBadBut / CVE-2024-1874 class). No real Codex
+# model id needs anything outside this set. Note this is stricter than the
+# API-level GenerateRequest.model pattern, which allows `/` for OpenRouter ids.
+_CODEX_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 class GenerationResult:
@@ -261,6 +271,20 @@ class StudyMaterialGenerator:
         and validated with Pydantic, matching the anthropic/openrouter text path.
         """
         model_for_result = self.model or "codex-default"
+
+        # Reject metacharacter-laden model names BEFORE spawning any process, so a
+        # malicious `-m` value can never reach the cmd.exe-backed codex.cmd shim.
+        if self.model and not _CODEX_MODEL_PATTERN.match(self.model):
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=(
+                    "Invalid model name for Codex provider. Use only letters, "
+                    "digits, and the characters . _ : -"
+                ),
+                model=model_for_result,
+                status_code=400,
+            )
 
         codex_path = shutil.which("codex")
         if codex_path is None:

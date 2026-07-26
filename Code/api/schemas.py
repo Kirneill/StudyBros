@@ -118,7 +118,11 @@ class GenerateRequest(BaseModel):
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
     provider: GenerationProvider = "openai"
     api_key: str | None = Field(default=None, min_length=1)
-    model: str | None = None
+    # Model ids are restricted to a safe character set (letters, digits, . _ : - /)
+    # as defense in depth against shell/argv injection into CLI-backed providers.
+    # `/` is allowed for OpenRouter ids (e.g. anthropic/claude-sonnet-4.6); the
+    # codex sink applies a stricter pattern that excludes `/`.
+    model: str | None = Field(default=None, pattern=r"^[A-Za-z0-9._:/-]+$")
 
 
 class GenerationProviderResponse(BaseModel):
