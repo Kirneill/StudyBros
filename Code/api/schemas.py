@@ -109,7 +109,7 @@ class StudySessionCompleteResponse(BaseModel):
 # Generation
 # ---------------------------------------------------------------------------
 
-GenerationProvider = Literal["openai", "anthropic", "openrouter"]
+GenerationProvider = Literal["openai", "anthropic", "openrouter", "codex"]
 
 
 class GenerateRequest(BaseModel):
