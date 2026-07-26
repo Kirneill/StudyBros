@@ -6,7 +6,13 @@ const API_KEY_PREFIX = "studybros_api_key:";
 export function getPreferredProvider(): GenerationProvider | null {
   if (typeof window === "undefined") return null;
   const stored = sessionStorage.getItem(PREF_PROVIDER_KEY);
-  if (stored === "openai" || stored === "anthropic" || stored === "openrouter") return stored;
+  if (
+    stored === "openai" ||
+    stored === "anthropic" ||
+    stored === "openrouter" ||
+    stored === "codex"
+  )
+    return stored;
   return null;
 }
 

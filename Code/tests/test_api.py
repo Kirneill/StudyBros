@@ -339,6 +339,100 @@ def test_generate_flashcards_requires_provider_key(client, monkeypatch):
     assert "API key not configured" in response.json()["detail"]
 
 
+def test_providers_includes_codex_availability(client, monkeypatch):
+    """codex advertises has_server_key based on CLI availability, not an API key."""
+    monkeypatch.setattr(type(config), "is_codex_cli_available", classmethod(lambda cls: True))
+
+    response = client.get("/api/generate/providers")
+    assert response.status_code == 200
+    providers = {entry["provider"]: entry for entry in response.json()["providers"]}
+    assert "codex" in providers
+    assert providers["codex"]["display_name"] == "Codex CLI"
+    assert providers["codex"]["has_server_key"] is True
+
+
+def test_generate_flashcards_with_codex(client, monkeypatch):
+    """codex generation ignores api_key and routes to the codex-backed generator."""
+    doc_id, _ = _seed_document()
+    monkeypatch.setattr(type(config), "is_codex_cli_available", classmethod(lambda cls: True))
+
+    def fake_generate_from_chunks(
+        self: StudyMaterialGenerator,
+        chunks: list[str],
+        generation_type: str,
+        count: int = 10,
+    ) -> GenerationResult:
+        assert self.provider == "codex"
+        assert generation_type == "flashcards"
+        return GenerationResult(
+            content=FlashcardSet.model_validate({
+                "cards": [
+                    {
+                        "question": "What is Python?",
+                        "answer": "A programming language",
+                        "tags": ["cs"],
+                        "difficulty": "easy",
+                    }
+                ]
+            }),
+            success=True,
+            tokens_used=0,
+            model="codex-default",
+        )
+
+    monkeypatch.setattr(StudyMaterialGenerator, "generate_from_chunks", fake_generate_from_chunks)
+
+    response = client.post(
+        "/api/generate/flashcards",
+        json={
+            "document_id": doc_id,
+            "count": 5,
+            "difficulty": "mixed",
+            "provider": "codex",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["item_count"] == 1
+    assert data["set_type"] == "flashcards"
+
+
+def test_generate_rejects_metacharacter_model_with_422(client, monkeypatch):
+    """A model id with shell metacharacters is rejected at request validation."""
+    doc_id, _ = _seed_document()
+    monkeypatch.setattr(type(config), "is_codex_cli_available", classmethod(lambda cls: True))
+
+    response = client.post(
+        "/api/generate/flashcards",
+        json={
+            "document_id": doc_id,
+            "count": 3,
+            "difficulty": "mixed",
+            "provider": "codex",
+            "model": 'x" & calc & "',
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_generate_with_codex_cli_missing_returns_503(client, monkeypatch):
+    """When the codex CLI is not on PATH, the route rejects with 503."""
+    doc_id, _ = _seed_document()
+    monkeypatch.setattr(type(config), "is_codex_cli_available", classmethod(lambda cls: False))
+
+    response = client.post(
+        "/api/generate/flashcards",
+        json={
+            "document_id": doc_id,
+            "count": 5,
+            "difficulty": "mixed",
+            "provider": "codex",
+        },
+    )
+    assert response.status_code == 503
+    assert "Codex CLI not found" in response.json()["detail"]
+
+
 # ---------------------------------------------------------------------------
 # Study Sets
 # ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ const PROVIDERS: { id: GenerationProvider; label: string; description: string }[
   { id: "openai", label: "OpenAI", description: "GPT models" },
   { id: "anthropic", label: "Anthropic", description: "Claude models" },
   { id: "openrouter", label: "OpenRouter", description: "Multiple providers via one key" },
+  { id: "codex", label: "Codex CLI", description: "Uses local login, no API key" },
 ];
 
 export default function SettingsPage() {
@@ -114,25 +115,35 @@ export default function SettingsPage() {
           <CardTitle>API Key</CardTitle>
         </CardHeader>
         <div className="px-6 pb-6">
-          <p className="text-sm text-text-muted mb-4">
-            {getServerStatus(selectedProvider)
-              ? `The server has a key for ${PROVIDERS.find((p) => p.id === selectedProvider)?.label}. You can override it with your own.`
-              : `Enter your ${PROVIDERS.find((p) => p.id === selectedProvider)?.label} API key to enable generation.`}
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={`Enter ${selectedProvider} API key...`}
-              className="flex-1 px-3 py-2 rounded-lg bg-bg-input border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-            {apiKey && (
-              <Button variant="ghost" size="sm" onClick={handleClearKey}>
-                Clear
-              </Button>
-            )}
-          </div>
+          {selectedProvider === "codex" ? (
+            <p className="text-sm text-text-muted">
+              {getServerStatus("codex")
+                ? "Codex CLI uses your local login on the server — no API key needed. Run `codex login` on the server to authenticate."
+                : "Codex CLI not detected on the server. Install it (`npm i -g @openai/codex`) and run `codex login`."}
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-text-muted mb-4">
+                {getServerStatus(selectedProvider)
+                  ? `The server has a key for ${PROVIDERS.find((p) => p.id === selectedProvider)?.label}. You can override it with your own.`
+                  : `Enter your ${PROVIDERS.find((p) => p.id === selectedProvider)?.label} API key to enable generation.`}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={`Enter ${selectedProvider} API key...`}
+                  className="flex-1 px-3 py-2 rounded-lg bg-bg-input border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                {apiKey && (
+                  <Button variant="ghost" size="sm" onClick={handleClearKey}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </Card>
 

@@ -15,14 +15,29 @@ PROVIDER_DISPLAY_NAMES = {
     "openai": "OpenAI",
     "anthropic": "Claude",
     "openrouter": "OpenRouter",
+    "codex": "Codex CLI",
 }
 
 
 def _require_provider_key(provider: str, request_key: str | None) -> None:
-    """Raise 503 if neither the request nor the server provides a provider key."""
+    """Raise 503 if the provider cannot generate without a user-supplied key.
+
+    For codex there is no API key; availability means the CLI is on PATH, and a
+    request-supplied key is irrelevant (ignored).
+    """
+    if provider == "codex":
+        if not config.is_provider_available("codex"):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Codex CLI not found on the server. Install it "
+                    "(`npm i -g @openai/codex`) and run `codex login`."
+                ),
+            )
+        return
     if request_key:
         return
-    if not config.has_provider_api_key(provider):
+    if not config.is_provider_available(provider):
         provider_label = PROVIDER_DISPLAY_NAMES[provider]
         raise HTTPException(
             status_code=503,
@@ -35,13 +50,18 @@ def _require_provider_key(provider: str, request_key: str | None) -> None:
 
 @router.get("/providers", response_model=GenerationProvidersResponse)
 def get_generation_providers():
-    """Return generation providers and whether the server has keys for them."""
+    """Return generation providers and whether the server can use them.
+
+    `has_server_key` reports whether the server can generate WITHOUT a
+    user-supplied key. For codex this is true when the CLI is on PATH (local
+    login); the frontend reads this field to decide whether to prompt for a key.
+    """
     providers = []
     for provider, label in PROVIDER_DISPLAY_NAMES.items():
         providers.append({
             "provider": provider,
             "display_name": label,
-            "has_server_key": config.has_provider_api_key(provider),
+            "has_server_key": config.is_provider_available(provider),
             "default_model": config.get_generation_model(provider),
         })
     return {"providers": providers}

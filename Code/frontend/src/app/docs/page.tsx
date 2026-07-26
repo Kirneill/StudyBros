@@ -99,7 +99,7 @@ export default function DocsPage() {
                   },
                   {
                     step: "Generate",
-                    text: "Pick an AI provider (OpenAI, Claude, or OpenRouter) and choose your material type — flashcards, quiz, practice test, or summary.",
+                    text: "Pick an AI provider (OpenAI, Claude, OpenRouter, or the Codex CLI with no API key) and choose your material type — flashcards, quiz, practice test, or summary.",
                   },
                   {
                     step: "Study",

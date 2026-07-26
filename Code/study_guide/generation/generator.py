@@ -3,6 +3,11 @@ Study material generator using provider-specific LLM APIs.
 """
 
 import json
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 from typing import Literal, Type, TypeVar
 
 from anthropic import Anthropic
@@ -25,8 +30,21 @@ from study_guide.generation.prompts import (
 )
 from study_guide.generation.schemas import AudioSummary, FlashcardSet, PracticeTest, Quiz
 
-GenerationProvider = Literal["openai", "anthropic", "openrouter"]
+GenerationProvider = Literal["openai", "anthropic", "openrouter", "codex"]
 T = TypeVar("T", bound=BaseModel)
+
+# stderr/stdout fragments that indicate a Codex login/auth problem rather than
+# a transient failure. Matched case-insensitively. Kept tight so substrings like
+# "authored by" do not misclassify unrelated failures as 401.
+_CODEX_AUTH_PATTERNS = ("not logged in", "login", "unauthorized", "401", "authentication")
+
+# Allowed characters for a codex `-m <model>` argument. Excludes shell/cmd.exe
+# metacharacters (&, |, %, ", ^, <, >, spaces, /) because on Windows the resolved
+# `codex.cmd` shim re-enters cmd.exe, which re-parses metacharacters that Python's
+# argv quoting does not escape (BatBadBut / CVE-2024-1874 class). No real Codex
+# model id needs anything outside this set. Note this is stricter than the
+# API-level GenerateRequest.model pattern, which allows `/` for OpenRouter ids.
+_CODEX_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 class GenerationResult:
@@ -59,7 +77,7 @@ class StudyMaterialGenerator:
         model: str | None = None,
     ):
         default_provider = config.GENERATION_PROVIDER.lower()
-        if default_provider not in {"openai", "anthropic", "openrouter"}:
+        if default_provider not in {"openai", "anthropic", "openrouter", "codex"}:
             default_provider = "openai"
 
         self.provider: GenerationProvider = provider or default_provider  # type: ignore[assignment]
@@ -234,6 +252,158 @@ class StudyMaterialGenerator:
                 status_code=502,
             )
 
+    def _generate_with_codex(self, prompt: str, schema: Type[T]) -> GenerationResult:
+        """
+        Generate structured JSON by shelling out to the local Codex CLI.
+
+        Uses the user's Codex (ChatGPT) login rather than an API key. The full
+        prompt (system + schema-embedded user prompt) is piped via stdin — never
+        passed as an argv element — because on Windows the `codex.cmd` shim routes
+        through cmd.exe, which mangles shell metacharacters (%, &, |, <, >) and
+        caps the command line at 32767 chars. The trailing `-` argv element tells
+        `codex exec` to read the prompt from stdin.
+
+        Note: `--output-schema` is intentionally NOT used. It enables OpenAI strict
+        constrained decoding, which requires `additionalProperties: false` on every
+        object in the schema; Pydantic's default JSON schema does not emit that, so
+        even simple schemas are rejected with HTTP 400. Instead the schema text is
+        embedded in the prompt (via `_build_json_prompt`) and the result is parsed
+        and validated with Pydantic, matching the anthropic/openrouter text path.
+        """
+        model_for_result = self.model or "codex-default"
+
+        # Reject metacharacter-laden model names BEFORE spawning any process, so a
+        # malicious `-m` value can never reach the cmd.exe-backed codex.cmd shim.
+        if self.model and not _CODEX_MODEL_PATTERN.match(self.model):
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=(
+                    "Invalid model name for Codex provider. Use only letters, "
+                    "digits, and the characters . _ : -"
+                ),
+                model=model_for_result,
+                status_code=400,
+            )
+
+        codex_path = shutil.which("codex")
+        if codex_path is None:
+            return GenerationResult(
+                content=None,
+                success=False,
+                error=(
+                    "Codex CLI not installed or not on PATH. Install it "
+                    "(`npm i -g @openai/codex`) and run `codex login`."
+                ),
+                model=model_for_result,
+                status_code=503,
+            )
+
+        full_prompt = f"{SYSTEM_PROMPT}\n\n{self._build_json_prompt(prompt, schema)}"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            last_message_path = Path(tmpdir) / "last_message.txt"
+            argv = [
+                codex_path,
+                "exec",
+                "--skip-git-repo-check",
+                "--ephemeral",
+                "-s",
+                "read-only",
+                "--color",
+                "never",
+                "-o",
+                str(last_message_path),
+            ]
+            if self.model:
+                argv += ["-m", self.model]
+            argv.append("-")
+
+            try:
+                result = subprocess.run(
+                    argv,
+                    input=full_prompt,
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=config.CODEX_TIMEOUT_SECONDS,
+                )
+            except FileNotFoundError:
+                return GenerationResult(
+                    content=None,
+                    success=False,
+                    error=(
+                        "Codex CLI not installed or not on PATH. Install it "
+                        "(`npm i -g @openai/codex`) and run `codex login`."
+                    ),
+                    model=model_for_result,
+                    status_code=503,
+                )
+            except subprocess.TimeoutExpired:
+                return GenerationResult(
+                    content=None,
+                    success=False,
+                    error=(
+                        f"Codex CLI timed out after {config.CODEX_TIMEOUT_SECONDS}s. "
+                        "Increase STUDY_GUIDE_CODEX_TIMEOUT or reduce the item count."
+                    ),
+                    model=model_for_result,
+                    status_code=504,
+                )
+
+            if result.returncode != 0:
+                combined = f"{result.stderr or ''}\n{result.stdout or ''}"
+                tail = combined.strip()[-500:]
+                lowered = combined.lower()
+                if any(pattern in lowered for pattern in _CODEX_AUTH_PATTERNS):
+                    return GenerationResult(
+                        content=None,
+                        success=False,
+                        error=(
+                            "Codex CLI is not authenticated. Run `codex login` on the "
+                            f"server. Details: {tail}"
+                        ),
+                        model=model_for_result,
+                        status_code=401,
+                    )
+                return GenerationResult(
+                    content=None,
+                    success=False,
+                    error=f"Codex CLI failed (exit {result.returncode}): {tail}",
+                    model=model_for_result,
+                    status_code=502,
+                )
+
+            try:
+                raw_text = last_message_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                return GenerationResult(
+                    content=None,
+                    success=False,
+                    error=f"Codex CLI produced no output file: {exc}",
+                    model=model_for_result,
+                    status_code=502,
+                )
+
+            try:
+                parsed = self._parse_structured_text(raw_text, schema)
+            except Exception as exc:
+                return GenerationResult(
+                    content=None,
+                    success=False,
+                    error=f"Codex CLI returned unparseable output: {exc}",
+                    model=model_for_result,
+                    status_code=502,
+                )
+
+            return GenerationResult(
+                content=parsed,
+                success=True,
+                tokens_used=0,
+                model=model_for_result,
+            )
+
     def _generate_structured(
         self,
         prompt: str,
@@ -257,6 +427,8 @@ class StudyMaterialGenerator:
                 schema,
                 base_url="https://openrouter.ai/api/v1",
             )
+        if self.provider == "codex":
+            return self._generate_with_codex(prompt, schema)
         return self._generate_with_openai_compatible(prompt, schema)
 
     def generate_flashcards(

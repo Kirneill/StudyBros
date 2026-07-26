@@ -50,6 +50,25 @@ python -m study_guide ingest ./materials
 python -m study_guide generate flashcards --doc 1 --count 20
 ```
 
+### Codex CLI (no API key)
+
+If you have the [Codex CLI](https://github.com/openai/codex) installed and logged in,
+you can generate with **no API key** — it uses your local ChatGPT login instead.
+
+```bash
+npm i -g @openai/codex   # install the CLI
+codex login              # authenticate once
+export STUDY_GUIDE_GENERATION_PROVIDER=codex   # or pick "Codex CLI" in the web app
+python -m study_guide generate flashcards --doc 1 --count 20
+```
+
+Each generation shells out to `codex exec` (real runs take ~1-5 minutes for large
+counts). The prompt is piped over stdin, so no API key is ever sent or stored.
+
+> Note: having the CLI on PATH does not prove you are logged in. A logged-out
+> machine still advertises Codex as available and will fail at generation time
+> with an actionable "run `codex login`" error.
+
 ## Installation
 
 ```bash
@@ -166,6 +185,9 @@ Environment variables (set in `.env`, see `env.example.txt`):
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key (required for CLI, not for MCP) | -- |
+| `STUDY_GUIDE_GENERATION_PROVIDER` | Generation provider: `openai`, `anthropic`, `openrouter`, `codex` | `openai` |
+| `STUDY_GUIDE_CODEX_MODEL` | Model for the codex provider (empty = CLI default) | -- |
+| `STUDY_GUIDE_CODEX_TIMEOUT` | Max seconds to wait for a codex run | `300` |
 | `STUDY_GUIDE_DB_PATH` | SQLite database file path | `./data/study_guide.db` |
 | `STUDY_GUIDE_EXPORT_DIR` | Export output directory | `./data/exports` |
 | `STUDY_GUIDE_GENERATION_MODEL` | OpenAI model for CLI generation | `gpt-4o` |

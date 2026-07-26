@@ -85,7 +85,7 @@ export interface StudySessionCompleteResponse {
 }
 
 // Generation
-export type GenerationProvider = "openai" | "anthropic" | "openrouter";
+export type GenerationProvider = "openai" | "anthropic" | "openrouter" | "codex";
 
 export interface GenerateRequest {
   document_id: number;
