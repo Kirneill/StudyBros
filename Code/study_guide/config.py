@@ -3,6 +3,7 @@ Configuration management for the Study Guide application.
 """
 
 import os
+import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -46,6 +47,11 @@ class Config:
         "anthropic/claude-sonnet-4.6",
     )
 
+    # Codex CLI provider settings (no API key; uses local `codex` login)
+    # Empty model means "use the model default from ~/.codex/config.toml".
+    CODEX_GENERATION_MODEL = os.getenv("STUDY_GUIDE_CODEX_MODEL", "")
+    CODEX_TIMEOUT_SECONDS = int(os.getenv("STUDY_GUIDE_CODEX_TIMEOUT", "300"))
+
     # Backward-compatible alias for legacy call sites
     GENERATION_MODEL = OPENAI_GENERATION_MODEL
     TRANSCRIPTION_MODEL = os.getenv("STUDY_GUIDE_TRANSCRIPTION_MODEL", "whisper-1")
@@ -87,9 +93,12 @@ class Config:
             errors.append("OPENROUTER_API_KEY is not set")
         elif provider == "openai" and not cls.OPENAI_API_KEY:
             errors.append("OPENAI_API_KEY is not set")
-        elif provider not in {"openai", "anthropic", "openrouter"}:
+        elif provider == "codex" and shutil.which("codex") is None:
+            errors.append("Codex CLI ('codex') not found on PATH")
+        elif provider not in {"openai", "anthropic", "openrouter", "codex"}:
             errors.append(
-                "STUDY_GUIDE_GENERATION_PROVIDER must be one of: openai, anthropic, openrouter"
+                "STUDY_GUIDE_GENERATION_PROVIDER must be one of: "
+                "openai, anthropic, openrouter, codex"
             )
         return errors
 
@@ -101,12 +110,33 @@ class Config:
             return cls.ANTHROPIC_API_KEY
         if normalized == "openrouter":
             return cls.OPENROUTER_API_KEY
+        if normalized == "codex":
+            # Codex uses the local CLI login, not an API key.
+            return ""
         return cls.OPENAI_API_KEY
 
     @classmethod
     def has_provider_api_key(cls, provider: str) -> bool:
         """Whether a provider has a server-configured API key."""
         return bool(cls.get_provider_api_key(provider).strip())
+
+    @classmethod
+    def is_codex_cli_available(cls) -> bool:
+        """Whether the Codex CLI is resolvable on PATH."""
+        return shutil.which("codex") is not None
+
+    @classmethod
+    def is_provider_available(cls, provider: str) -> bool:
+        """
+        Whether the server can generate for a provider without a user-supplied key.
+
+        For codex this means the CLI is on PATH (uses local login). For all other
+        providers it means the server has an API key configured. This is the field
+        the frontend reads to decide whether to prompt for a key.
+        """
+        if provider.lower() == "codex":
+            return cls.is_codex_cli_available()
+        return cls.has_provider_api_key(provider)
 
     @classmethod
     def get_generation_model(cls, provider: str) -> str:
@@ -116,6 +146,9 @@ class Config:
             return cls.ANTHROPIC_GENERATION_MODEL
         if normalized == "openrouter":
             return cls.OPENROUTER_GENERATION_MODEL
+        if normalized == "codex":
+            # Empty string = use the CLI's own default model.
+            return cls.CODEX_GENERATION_MODEL
         return cls.OPENAI_GENERATION_MODEL
 
     @classmethod
