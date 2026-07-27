@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/dev.mjs",
+    "dev:frontend": "next dev --webpack",
+    "test:dev": "node --test scripts/dev.test.mjs",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
